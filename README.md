@@ -50,7 +50,7 @@ const router = contractRouter({
     getUsers: async (request) => {
       // request.query is fully typed and validated!
       const { page, limit } = request.query;
-      
+
       // Return typed response
       return request.json({
         users: ['alice', 'bob'],
@@ -127,7 +127,7 @@ const router = contractRouter({
     createUser: async (request) => {
       // request.body is fully typed and validated!
       const { name, email } = request.body;
-      
+
       // TypeScript ensures you return a valid response
       return request.json({ id: '123', name }, 201);
     },
@@ -159,7 +159,7 @@ const router = contractRouter({
     getUser: async (request) => {
       // request.params.id is typed as string and validated as UUID
       const { id } = request.params;
-      
+
       return request.json({ id, name: 'Alice' }, 200);
     },
   },
@@ -190,12 +190,12 @@ const router = contractRouter({
     updateUser: async (request) => {
       const { id } = request.params;
       const { name } = request.body;
-      
+
       // Use request.error() for error responses
       if (!userExists(id)) {
         return request.error(404, { error: 'User not found' });
       }
-      
+
       // Use request.json() for success responses
       return request.json({ id, name }, 200);
     },
@@ -231,7 +231,7 @@ const router = contractRouter({
     getData: async (request) => {
       // request.headers is typed and validated
       const apiKey = request.headers['x-api-key'];
-      
+
       return request.json(
         { data: 'secret' },
         200,
@@ -249,6 +249,7 @@ const router = contractRouter({
 Creates a contract from a contract definition. Validates the structure and returns a fully typed contract.
 
 **Parameters:**
+
 - `definition` - A contract definition object mapping operation IDs to operations
 
 **Returns:** The same contract definition with full type inference
@@ -258,6 +259,7 @@ Creates a contract from a contract definition. Validates the structure and retur
 Creates a type-safe router from a contract definition.
 
 **Parameters:**
+
 - `options.contract` - The contract definition
 - `options.handlers` - Object mapping operation IDs to handler functions
 - `options.base` - (optional) Base path for all routes
@@ -311,6 +313,7 @@ npm run build
 ```
 
 This generates:
+
 - `dist/index.js` - ESM bundle
 - `dist/index.cjs` - CommonJS bundle
 - `dist/index.d.ts` - TypeScript declarations

@@ -29,6 +29,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:types": "vitest --typecheck",
     "prepublishOnly": "npm run build"
   },
   "keywords": [],

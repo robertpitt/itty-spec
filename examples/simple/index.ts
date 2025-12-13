@@ -1,11 +1,20 @@
-import { contract } from "./contract"
-import { contractRouter } from "../../src/index.ts";
+import { contract } from './contract';
+import { contractRouter } from '../../src/index.ts';
 
 const router = contractRouter({
   contract,
   handlers: {
     getCalculate: async (request) => {
-      return request.json({result: request.query.a + request.query.b}, 200)
+      const result = request.query.a + request.query.b;
+      return result > 100
+        ? request.json({ error: 'Invalid request' }, 400)
+        : request.json({ result: result }, 200);
+    },
+    postCalculate: async (request) => {
+      const result = request.body.a + request.body.b;
+      return result > 100
+        ? request.json({ error: 'Invalid request' }, 400)
+        : request.json({ result: result }, 200);
     },
   },
 });

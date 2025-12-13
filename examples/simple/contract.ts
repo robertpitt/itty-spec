@@ -9,6 +9,9 @@ export const contract = createContract({
     operationId: 'helloWorld',
     path: '/calculate',
     method: 'GET',
+    headers: z.object({
+      'Content-Type': z.literal('application/json'),
+    }),
     query: z.object({
       a: z.number().min(0).max(100).meta({ description: 'The first number' }),
       b: z.number().min(0).max(100).meta({ description: 'The second number' }),
@@ -22,7 +25,7 @@ export const contract = createContract({
     operationId: 'postCalculate',
     path: '/calculate',
     method: 'POST',
-    body: z.object({ a: z.number().min(0).max(100), b: z.number().min(0).max(100) }),
+    request: z.object({ a: z.number().min(0).max(100), b: z.number().min(0).max(100) }),
     responses: {
       200: { body: z.object({ result: z.number() }) },
       400: { body: z.object({ error: z.string() }) },
