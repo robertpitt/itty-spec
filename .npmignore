@@ -1,0 +1,30 @@
+# Source files
+src/
+*.ts
+!*.d.ts
+
+# Configuration files
+tsconfig.json
+tsdown.config.ts
+.gitignore
+.npmignore
+
+# Development files
+node_modules/
+*.log
+.DS_Store
+
+# Build artifacts (if any)
+*.tsbuildinfo
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
