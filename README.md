@@ -1,27 +1,64 @@
 # itty-spec
 
-> Type-safe API contracts for [itty-router](https://github.com/kwhitley/itty-router)
+> **Type-safe API contracts for [itty-router](https://github.com/kwhitley/itty-router)** — Build robust APIs with contracts that define routes, validation, and types in one place.
 
-`itty-spec` provides a type-safe, contract-based approach to building APIs with itty-router. Define your API contracts using Zod schemas, and get automatic request/response validation with full TypeScript type inference.
+`itty-spec` transforms how you build APIs by combining contract-driven development with full TypeScript type safety. Define your API once, and get automatic validation, type inference, and route registration—all without boilerplate.
 
-## Features
+## ✨ Why itty-spec?
 
-- 🔒 **Type-safe contracts** - Define API contracts with Zod schemas and get full TypeScript inference
-- ✅ **Automatic validation** - Request and response validation happens automatically
-- 🎯 **Zero boilerplate** - Contracts define routes, validation, and types in one place
-- 🚀 **Edge-compatible** - Built on itty-router, works everywhere (Cloudflare Workers, Node.js, Bun, etc.)
-- 📝 **Rich schema support** - Path params, query params, headers, body, and typed responses
-- 🛡️ **Type-safe handlers** - Handlers receive fully typed requests with validated data
+Building APIs shouldn't mean juggling separate route definitions, validation logic, and type definitions. `itty-spec` brings them together in a single, elegant contract that improves your developer experience at every step.
 
-## Installation
+### 🎯 Developer Experience Features
+
+#### **🔒 End-to-End Type Safety**
+- **Full TypeScript inference** — Your contracts automatically generate types for requests, responses, and handlers
+- **Compile-time guarantees** — Catch API mismatches before runtime with TypeScript's type checker
+- **IntelliSense support** — Autocomplete for all request properties (`params`, `query`, `body`, `headers`) based on your contract
+- **Type-safe responses** — Response helpers (`json`, `error`, `noContent`) validate against your contract schemas
+
+#### **⚡ Zero Boilerplate**
+- **Single source of truth** — Define routes, validation, and types in one contract definition
+- **Automatic route registration** — Routes are registered automatically from your contract—no manual route setup
+- **Smart defaults** — Optional `operationId` (uses contract key), optional `method` (defaults to GET), and sensible defaults throughout
+- **Path parameter extraction** — Automatically extracts and types path parameters from route strings (e.g., `/users/:id` → `{ id: string }`)
+
+#### **🛡️ Automatic Validation**
+- **Request validation** — Path params, query params, headers, and body are validated automatically before reaching your handler
+- **Response validation** — Response helpers ensure your responses match your contract schemas
+- **Early error detection** — Invalid requests fail fast with clear validation errors
+- **Standard Schema support** — Built on [Standard Schema V1](https://github.com/standard-schema/spec), compatible with Zod, Valibot, and more
+
+#### **🚀 Developer-Friendly API**
+- **Typed request object** — Handlers receive a fully typed request with validated data ready to use
+- **Response helpers** — `request.json()`, `request.error()`, and `request.noContent()` with contract-aware type checking
+- **Default status codes** — `request.json()` defaults to 200 when omitted (if 200 is valid in your contract)
+- **Multiple response types** — Support for multiple status codes with type-safe discriminated unions
+
+#### **🔧 Flexible & Extensible**
+- **Middleware support** — Add custom `before` and `finally` middleware for cross-cutting concerns
+- **Custom formatters** — Override response formatting with your own formatter function
+- **Base path support** — Prefix all routes with a base path for API versioning
+- **Missing route handlers** — Customize 404 handling with typed response helpers
+- **Edge-compatible** — Works everywhere itty-router works (Cloudflare Workers, Node.js, Bun, Deno, etc.)
+
+#### **📝 Rich Schema Support**
+- **Path parameters** — Validate path params with schemas or auto-extract from route patterns
+- **Query parameters** — Full support for query string validation with defaults and transformations
+- **Request body** — Validate request bodies with any Standard Schema-compatible validator
+- **Headers** — Validate request and response headers with type safety
+- **Response headers** — Type-safe response headers per status code
+
+## 📦 Installation
 
 ```bash
 npm install itty-spec
 # or
 pnpm add itty-spec
+# or
+yarn add itty-spec
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 ```typescript
 import { createContract, contractRouter } from 'itty-spec';
@@ -30,7 +67,6 @@ import { z } from 'zod';
 // Define your API contract
 const contract = createContract({
   getUsers: {
-    operationId: 'getUsers',
     path: '/users',
     method: 'GET',
     query: z.object({
@@ -51,11 +87,11 @@ const router = contractRouter({
       // request.query is fully typed and validated!
       const { page, limit } = request.query;
 
-      // Return typed response
+      // Return typed response (status defaults to 200)
       return request.json({
         users: ['alice', 'bob'],
         total: 2,
-      }, 200);
+      });
     },
   },
 });
@@ -66,190 +102,100 @@ export default {
 };
 ```
 
-## Usage Examples
+## 🎨 Key Features in Detail
 
-### GET Endpoint with Query Parameters
+### Type-Safe Request Access
 
-```typescript
-import { createContract, contractRouter } from 'itty-spec';
-import { z } from 'zod';
-
-const contract = createContract({
-  getCalculate: {
-    operationId: 'getCalculate',
-    path: '/calculate',
-    method: 'GET',
-    query: z.object({
-      a: z.number().min(0).max(100),
-      b: z.number().min(0).max(100),
-    }),
-    responses: {
-      200: { body: z.object({ result: z.number() }) },
-      400: { body: z.object({ error: z.string() }) },
-    },
-  },
-});
-
-const router = contractRouter({
-  contract,
-  handlers: {
-    getCalculate: async (request) => {
-      const { a, b } = request.query;
-      return request.json({ result: a + b }, 200);
-    },
-  },
-});
-```
-
-### POST Endpoint with Body
+All request properties are fully typed based on your contract:
 
 ```typescript
-const contract = createContract({
-  createUser: {
-    operationId: 'createUser',
-    path: '/users',
-    method: 'POST',
-    body: z.object({
-      name: z.string().min(1),
-      email: z.string().email(),
-      age: z.number().min(18).optional(),
-    }),
-    responses: {
-      201: { body: z.object({ id: z.string(), name: z.string() }) },
-      400: { body: z.object({ error: z.string() }) },
-    },
-  },
-});
+// Path params are typed and validated
+request.params.id  // string (from /users/:id)
 
-const router = contractRouter({
-  contract,
-  handlers: {
-    createUser: async (request) => {
-      // request.body is fully typed and validated!
-      const { name, email } = request.body;
+// Query params are typed, validated, and have defaults applied
+request.query.page  // number (validated, default: 1)
 
-      // TypeScript ensures you return a valid response
-      return request.json({ id: '123', name }, 201);
-    },
-  },
-});
+// Body is typed and validated
+request.body.email  // string (validated as email)
+
+// Headers are typed and validated
+request.headers['x-api-key']  // string (validated)
 ```
 
-### Path Parameters
+### Type-Safe Response Helpers
+
+Response helpers ensure your responses match your contract:
+
+```typescript
+// Defaults to 200 if omitted (when 200 is valid)
+request.json({ users: [] })
+
+// Explicit status code with type checking
+request.json({ id: '123' }, 201)
+
+// Error responses with contract validation
+request.error(404, { error: 'Not found' })
+
+// No-content responses
+request.noContent(204)
+```
+
+### Automatic Path Parameter Extraction
+
+Path parameters are automatically extracted and typed from your route patterns:
 
 ```typescript
 const contract = createContract({
   getUser: {
-    operationId: 'getUser',
-    path: '/users/:id',
-    method: 'GET',
-    pathParams: z.object({
-      id: z.string().uuid(),
-    }),
-    responses: {
-      200: { body: z.object({ id: z.string(), name: z.string() }) },
-      404: { body: z.object({ error: z.string() }) },
-    },
-  },
-});
-
-const router = contractRouter({
-  contract,
-  handlers: {
-    getUser: async (request) => {
-      // request.params.id is typed as string and validated as UUID
-      const { id } = request.params;
-
-      return request.json({ id, name: 'Alice' }, 200);
-    },
+    path: '/users/:id/posts/:postId',  // Auto-extracts { id: string, postId: string }
+    // ... rest of contract
   },
 });
 ```
 
-### Multiple Response Status Codes
+### Multiple Response Types
+
+Support multiple status codes with type-safe discriminated unions:
 
 ```typescript
-const contract = createContract({
-  updateUser: {
-    operationId: 'updateUser',
-    path: '/users/:id',
-    method: 'PUT',
-    pathParams: z.object({ id: z.string() }),
-    body: z.object({ name: z.string().min(1) }),
-    responses: {
-      200: { body: z.object({ id: z.string(), name: z.string() }) },
-      400: { body: z.object({ error: z.string() }) },
-      404: { body: z.object({ error: z.string() }) },
-    },
-  },
-});
-
-const router = contractRouter({
-  contract,
-  handlers: {
-    updateUser: async (request) => {
-      const { id } = request.params;
-      const { name } = request.body;
-
-      // Use request.error() for error responses
-      if (!userExists(id)) {
-        return request.error(404, { error: 'User not found' });
-      }
-
-      // Use request.json() for success responses
-      return request.json({ id, name }, 200);
-    },
-  },
-});
+responses: {
+  200: { body: z.object({ user: z.object({ id: z.string() }) }) },
+  404: { body: z.object({ error: z.string() }) },
+  500: { body: z.object({ error: z.string() }) },
+}
 ```
 
-### Headers and Custom Response Headers
+### Middleware Support
+
+Add custom middleware for authentication, logging, and more:
 
 ```typescript
-const contract = createContract({
-  getData: {
-    operationId: 'getData',
-    path: '/data',
-    method: 'GET',
-    headers: z.object({
-      'x-api-key': z.string(),
-    }),
-    responses: {
-      200: {
-        body: z.object({ data: z.string() }),
-        headers: z.object({
-          'x-request-id': z.string(),
-        }),
-      },
-    },
-  },
-});
-
 const router = contractRouter({
   contract,
-  handlers: {
-    getData: async (request) => {
-      // request.headers is typed and validated
-      const apiKey = request.headers['x-api-key'];
-
-      return request.json(
-        { data: 'secret' },
-        200,
-        { 'x-request-id': 'abc-123' }
-      );
+  handlers: { /* ... */ },
+  before: [
+    async (request) => {
+      // Custom middleware before handlers
+      console.log('Request:', request.url);
     },
-  },
+  ],
+  finally: [
+    async (response) => {
+      // Custom middleware after handlers
+      console.log('Response:', response.status);
+      return response;
+    },
+  ],
 });
 ```
 
-## API Reference
+## 📚 API Reference
 
 ### `createContract<T>(definition: T): T`
 
-Creates a contract from a contract definition. Validates the structure and returns a fully typed contract.
+Creates a contract from a contract definition. Provides full type inference and validates the structure.
 
 **Parameters:**
-
 - `definition` - A contract definition object mapping operation IDs to operations
 
 **Returns:** The same contract definition with full type inference
@@ -259,7 +205,6 @@ Creates a contract from a contract definition. Validates the structure and retur
 Creates a type-safe router from a contract definition.
 
 **Parameters:**
-
 - `options.contract` - The contract definition
 - `options.handlers` - Object mapping operation IDs to handler functions
 - `options.base` - (optional) Base path for all routes
@@ -284,19 +229,12 @@ Handlers receive a typed request object with the following properties:
 
 All properties are fully typed based on your contract definition.
 
-### Types
-
-- `ContractDefinition` - Type for contract definitions
-- `ContractOperation` - Type for individual contract operations
-- `Handler<TOperation>` - Type for handler functions
-- `TypedContractRequest<TOperation>` - Type for the request object in handlers
-
-## Development
+## 🛠️ Development
 
 ### Prerequisites
 
 - Node.js 18+
-- npm or pnpm
+- npm, pnpm, or yarn
 
 ### Setup
 
@@ -306,14 +244,11 @@ npm install
 
 ### Build
 
-Build the library:
-
 ```bash
 npm run build
 ```
 
 This generates:
-
 - `dist/index.js` - ESM bundle
 - `dist/index.cjs` - CommonJS bundle
 - `dist/index.d.ts` - TypeScript declarations
@@ -331,14 +266,6 @@ npm test
 npm run format
 ```
 
-### Publishing
-
-The `prepublishOnly` script automatically runs the build before publishing:
-
-```bash
-npm publish
-```
-
-## License
+## 📄 License
 
 MIT
