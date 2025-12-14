@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { createContract, contractRouter } from '../../src/router.js';
+import { createContract, createRouter } from '../../src/router.js';
 import { z } from 'zod/v4';
 
 test('GET request with query parameters should handle validated query parameters', async () => {
@@ -19,7 +19,7 @@ test('GET request with query parameters should handle validated query parameters
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getCalculate: async (request) => {
@@ -56,7 +56,7 @@ test('GET request with query parameters should return 400 for invalid query para
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getCalculate: async (request) => {
@@ -93,7 +93,7 @@ test('POST request with body should handle validated body', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       postCalculate: async (request) => {
@@ -134,7 +134,7 @@ test('POST request with body should return 400 for invalid body', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       postCalculate: async (request) => {
@@ -171,7 +171,7 @@ test('GET request with path parameters should handle path parameters', async () 
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUser: async (request) => {
@@ -205,7 +205,7 @@ test('GET request with path parameters should handle 404 for non-existent user',
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUser: async (request) => {
@@ -239,7 +239,7 @@ test('DELETE request with 204 No Content should handle DELETE request returning 
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       deleteUser: async (request) => {
@@ -277,7 +277,7 @@ test('Request with headers validation should handle request with validated heade
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getProtected: async (request) => {
@@ -317,7 +317,7 @@ test('Error handling should handle validation errors gracefully', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       postUser: async (request) => {
@@ -358,7 +358,7 @@ test('Query parameter validation should return 400 with error details for missin
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       search: async (request) => {
@@ -400,7 +400,7 @@ test('Query parameter validation should return 400 for invalid type', async () =
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getItems: async (request) => {
@@ -436,7 +436,7 @@ test('Body validation should return 400 with error details for missing required 
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createUser: async (request) => {
@@ -476,7 +476,7 @@ test('Body validation should return 400 for invalid email format', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createUser: async (request) => {
@@ -515,7 +515,7 @@ test('Body validation should return 400 for value below minimum constraint', asy
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createUser: async (request) => {
@@ -555,7 +555,7 @@ test('Body validation should return 400 for value above maximum constraint', asy
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createProduct: async (request) => {
@@ -602,7 +602,7 @@ test('Body validation should return 400 for invalid nested object structure', as
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createOrder: async (request) => {
@@ -651,7 +651,7 @@ test('Body validation should return 400 for invalid array item', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createOrder: async (request) => {
@@ -695,7 +695,7 @@ test('Body validation should return 400 for invalid JSON body', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createUser: async (request) => {
@@ -732,7 +732,7 @@ test('Body validation should return 400 for empty body when body is required', a
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createUser: async (request) => {
@@ -771,7 +771,7 @@ test('Header validation should return 400 for missing required headers', async (
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getProtected: async (request) => {
@@ -805,7 +805,7 @@ test('Header validation should return 400 for invalid header format', async () =
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getProtected: async (request) => {
@@ -846,7 +846,7 @@ test('Multiple validation errors should return all error details', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createUser: async (request) => {
@@ -893,7 +893,7 @@ test('Query parameter validation should return 400 for invalid enum value', asyn
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       listItems: async (request) => {
@@ -928,7 +928,7 @@ test('Body validation should return 400 for invalid URL format', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createLink: async (request) => {
@@ -970,7 +970,7 @@ test('Body validation should return 400 for invalid UUID format', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUser: async (request) => {
@@ -1012,7 +1012,7 @@ test('Validation error response should have correct Content-Type header', async 
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createUser: async (request) => {
@@ -1065,7 +1065,7 @@ test('Multiple operations should handle multiple operations in same router', asy
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUsers: async (request) => {
@@ -1117,7 +1117,7 @@ test('Optional operationId should default to contract key', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUserProfile: async (request) => {
@@ -1146,7 +1146,7 @@ test('Optional method should default to GET', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       listItems: async (request) => {
@@ -1174,7 +1174,7 @@ test('Explicit operationId should override contract key', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUserProfile: async (request) => {
@@ -1204,7 +1204,7 @@ test('Explicit method should override default GET', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createItem: async (request) => {
@@ -1241,7 +1241,7 @@ test('Nested routes with multiple path parameters should handle complex paths', 
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUserPost: async (request) => {
@@ -1284,7 +1284,7 @@ test('Complex query parameters with arrays should handle array query params', as
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       searchItems: async (request) => {
@@ -1321,7 +1321,7 @@ test('PUT request should handle update operations', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       updateUser: async (request) => {
@@ -1374,7 +1374,7 @@ test('PATCH request should handle partial updates', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       patchUser: async (request) => {
@@ -1414,7 +1414,7 @@ test('Base path should prefix all routes', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     base: '/api/v1',
     handlers: {
@@ -1449,7 +1449,7 @@ test('Custom missing handler should handle 404 routes', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     missing: async (request) => {
       // Request object may have url property or we can construct it
@@ -1487,7 +1487,7 @@ test('Before middleware should run before handlers', async () => {
 
   const requestIds: string[] = [];
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     before: [
       async (request) => {
@@ -1526,7 +1526,7 @@ test('Finally middleware should run after handlers', async () => {
 
   const responseHeaders: string[] = [];
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     finally: [
       async (response) => {
@@ -1574,7 +1574,7 @@ test('Route precedence should match specific routes before general ones', async 
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUsers: async (request) => {
@@ -1619,7 +1619,7 @@ test('URL encoding should handle special characters in paths', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUser: async (request) => {
@@ -1662,7 +1662,7 @@ test('Query parameters with special characters should be handled correctly', asy
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       search: async (request) => {
@@ -1712,7 +1712,7 @@ test('Complex nested body should handle nested objects and arrays', async () => 
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createOrder: async (request) => {
@@ -1763,7 +1763,7 @@ test('Handler throwing errors should be handled gracefully', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUsers: async (request) => {
@@ -1806,7 +1806,7 @@ test('Multiple headers validation should handle case-insensitive headers', async
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getProtected: async (request) => {
@@ -1854,7 +1854,7 @@ test('Response headers should be set correctly', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUsers: async (request) => {
@@ -1892,7 +1892,7 @@ test('Empty query parameters should handle optional params', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       listItems: async (request) => {
@@ -1934,7 +1934,7 @@ test('Empty body should handle optional body validation', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       updateSettings: async (request) => {
@@ -1990,7 +1990,7 @@ test('Same path different methods should handle route conflicts correctly', asyn
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUsers: async (request) => {
@@ -2048,7 +2048,7 @@ test('Path parameters with special characters should be preserved', async () => 
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUser: async (request) => {
@@ -2092,7 +2092,7 @@ test('Large payload should handle big request bodies', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       bulkCreate: async (request) => {
@@ -2151,7 +2151,7 @@ test('Query parameter transformations should handle complex transforms', async (
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       search: async (request) => {
@@ -2200,7 +2200,7 @@ test('Union types in body should handle discriminated unions', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       createEvent: async (request) => {

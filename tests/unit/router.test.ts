@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { createContract, contractRouter } from '../../src/router.js';
+import { createContract, createRouter } from '../../src/router.js';
 import type { ContractDefinition } from '../../src/types.js';
 import { z } from 'zod/v4';
 
@@ -64,7 +64,7 @@ test('createContract should handle multiple operations', () => {
   expect(contract.getUser.path).toBe('/users/:id');
 });
 
-test('contractRouter should create router with contract and handlers', () => {
+test('createRouter should create router with contract and handlers', () => {
   const contract = createContract({
     getUsers: {
       operationId: 'getUsers',
@@ -76,7 +76,7 @@ test('contractRouter should create router with contract and handlers', () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUsers: async (request) => {
@@ -89,7 +89,7 @@ test('contractRouter should create router with contract and handlers', () => {
   expect(typeof router.fetch).toBe('function');
 });
 
-test('contractRouter should handle missing routes with default 404', async () => {
+test('createRouter should handle missing routes with default 404', async () => {
   const contract = createContract({
     getUsers: {
       operationId: 'getUsers',
@@ -101,7 +101,7 @@ test('contractRouter should handle missing routes with default 404', async () =>
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUsers: async (request) => {
@@ -116,7 +116,7 @@ test('contractRouter should handle missing routes with default 404', async () =>
   expect(response.status).toBe(404);
 });
 
-test('contractRouter should use custom missing handler', async () => {
+test('createRouter should use custom missing handler', async () => {
   const contract = createContract({
     getUsers: {
       operationId: 'getUsers',
@@ -128,7 +128,7 @@ test('contractRouter should use custom missing handler', async () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUsers: async (request) => {
@@ -148,7 +148,7 @@ test('contractRouter should use custom missing handler', async () => {
   expect(body).toEqual({ error: 'Not found' });
 });
 
-test('contractRouter should handle base path', () => {
+test('createRouter should handle base path', () => {
   const contract = createContract({
     getUsers: {
       operationId: 'getUsers',
@@ -160,7 +160,7 @@ test('contractRouter should handle base path', () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUsers: async (request) => {
@@ -173,7 +173,7 @@ test('contractRouter should handle base path', () => {
   expect(router).toBeDefined();
 });
 
-test('contractRouter should skip operations without handlers', () => {
+test('createRouter should skip operations without handlers', () => {
   const contract = createContract({
     getUsers: {
       operationId: 'getUsers',
@@ -193,7 +193,7 @@ test('contractRouter should skip operations without handlers', () => {
     },
   });
 
-  const router = contractRouter({
+  const router = createRouter({
     contract,
     handlers: {
       getUsers: async (request) => {

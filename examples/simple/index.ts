@@ -1,7 +1,7 @@
 import { contract } from './contract';
-import { contractRouter } from '../../src/index.ts';
+import { createRouter } from '../../src/index.ts';
 
-const router = contractRouter({
+const router = createRouter({
   contract,
   handlers: {
     getCalculate: async (request) => {
