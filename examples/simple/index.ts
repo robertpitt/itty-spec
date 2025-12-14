@@ -27,7 +27,7 @@ const openApiSpecification = createOpenApiSpecification(contract, {
   { "a": 1, "b": 2 }
   \`\`\`
   The response will be a JSON object with the following properties:
-  `
+  `,
 });
 
 /**

@@ -12,6 +12,7 @@
 - 🚀 **Edge-compatible** - Built on itty-router, works everywhere (Cloudflare Workers, Node.js, Bun, etc.)
 - 📝 **Rich schema support** - Path params, query params, headers, body, and typed responses
 - 🛡️ **Type-safe handlers** - Handlers receive fully typed requests with validated data
+- 📚 **OpenAPI generation** - Automatically convert contracts to OpenAPI 3.1 specifications (Zod supported)
 
 ## Installation
 
@@ -109,6 +110,81 @@ export default {
   fetch: router.fetch,
 };
 ```
+
+## OpenAPI Specification Generation
+
+`itty-spec` can automatically generate OpenAPI 3.1 specifications from your contracts. This is perfect for:
+- API documentation
+- Client SDK generation
+- API testing tools
+- Sharing API contracts with frontend teams
+
+### Basic Usage
+
+```typescript
+import { createOpenApiSpecification } from 'itty-spec/openapi';
+import { contract } from './contract';
+
+// Generate OpenAPI specification from your contract
+const openApiSpec = createOpenApiSpecification(contract, {
+  title: 'My API',
+  version: '1.0.0',
+  description: 'A comprehensive API for managing resources',
+  servers: [
+    { url: 'https://api.example.com', description: 'Production' },
+    { url: 'https://staging-api.example.com', description: 'Staging' },
+  ],
+});
+
+// Use the spec for documentation, client generation, etc.
+console.log(JSON.stringify(openApiSpec, null, 2));
+```
+
+### Serving Documentation
+
+You can serve interactive API documentation using the generated OpenAPI spec:
+
+```typescript
+import { createOpenApiSpecification } from 'itty-spec/openapi';
+import { createRouter } from 'itty-spec';
+
+const openApiSpec = createOpenApiSpecification(contract, {
+  title: 'My API',
+  version: '1.0.0',
+});
+
+const router = createRouter({
+  contract,
+  handlers: {
+    // Serve interactive documentation (using Stoplight Elements)
+    getDocs: async (request) => {
+      const html = `
+<!doctype html>
+<html>
+  <head>
+    <title>API Documentation</title>
+    <script src="https://unpkg.com/@stoplight/elements/web-components.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/@stoplight/elements/styles.min.css">
+  </head>
+  <body>
+    <elements-api apiDescriptionDocument='${JSON.stringify(openApiSpec)}' router="hash" layout="sidebar" />
+  </body>
+</html>`;
+      return new Response(html, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        status: 200,
+      });
+    },
+  },
+});
+```
+
+### Schema Support
+
+Currently, OpenAPI generation supports:
+- ✅ **Zod** - Full support for Zod v4 schemas with `toJSONSchema()` method
+
+Support for additional schema libraries (Valibot, ArkType, etc.) is planned for future releases.
 
 ## Development
 
