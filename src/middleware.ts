@@ -215,6 +215,7 @@ export function withResponseHelpers<TOperation extends ContractOperation>(
   return (request: IRequest) => {
     const helpers = createResponseHelpers(operation);
     defineProp(request, 'json', helpers.json);
+    defineProp(request, 'html', helpers.html);
     defineProp(request, 'error', helpers.error);
     defineProp(request, 'noContent', helpers.noContent);
   };
@@ -253,13 +254,31 @@ export function withContractFormat(customFormatter?: ResponseHandler): ResponseH
         headers?: HeadersInit;
       };
       const responseHeaders = new Headers(headers);
+
+      // Set default Content-Type if not provided
       if (!responseHeaders.has('Content-Type') && status !== 204) {
         responseHeaders.set('Content-Type', 'application/json');
       }
-      return new Response(
-        body === undefined || body === null || status === 204 ? null : JSON.stringify(body),
-        { status, headers: responseHeaders }
-      );
+
+      // Get Content-Type after potentially setting default
+      const contentType = responseHeaders.get('Content-Type') || '';
+
+      // Serialize body appropriately based on content type
+      let responseBody: BodyInit | null = null;
+      if (body === undefined || body === null || status === 204) {
+        responseBody = null;
+      } else if (
+        typeof body === 'string' &&
+        (contentType.startsWith('text/') || contentType.includes('html'))
+      ) {
+        // Return text/HTML as-is (don't JSON.stringify)
+        responseBody = body;
+      } else {
+        // JSON serialize for JSON content types or non-string bodies
+        responseBody = JSON.stringify(body);
+      }
+
+      return new Response(responseBody, { status, headers: responseHeaders });
     }
     return customFormatter ? customFormatter(response, request as IRequest) : json(response);
   };

@@ -21,12 +21,19 @@ function createResponse(status: number, body: unknown, headers?: unknown) {
  * Basic response helper methods for use in missing handlers
  * These helpers don't validate against a contract schema since there's no operation context
  *
- * @returns An object with json, noContent, and error helper methods
+ * @returns An object with json, html, noContent, and error helper methods
  */
 export function createBasicResponseHelpers() {
   return {
     json: (body: unknown, status: number, headers?: HeadersInit): Response =>
       createResponse(status, body, headers),
+    html: (html: string, status: number = 200, headers?: HeadersInit): Response => {
+      const responseHeaders = new Headers(headers);
+      if (!responseHeaders.has('Content-Type')) {
+        responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
+      }
+      return createResponse(status, html, responseHeaders);
+    },
     noContent: (status: number): Response => createResponse(status, undefined),
     error: (status: number, body: unknown, headers?: HeadersInit): Response =>
       createResponse(status, body, headers),
@@ -38,7 +45,7 @@ export function createBasicResponseHelpers() {
  * These helpers provide type-safe response creation methods that validate against the contract
  *
  * @param _operation - The contract operation (used for type inference, not runtime)
- * @returns Typed response helper methods (json, error, noContent) that match the contract
+ * @returns Typed response helper methods (json, html, error, noContent) that match the contract
  */
 export function createResponseHelpers<TOperation extends ContractOperation>(
   _operation: TOperation
@@ -47,6 +54,17 @@ export function createResponseHelpers<TOperation extends ContractOperation>(
     json(body: unknown, status?: number, headers?: unknown): any {
       const finalStatus = (status ?? 200) as ContractOperationStatusCodes<TOperation>;
       return createResponse(finalStatus, body, headers) as ResponseVariant<
+        TOperation,
+        typeof finalStatus
+      >;
+    },
+    html(html: string, status?: number, headers?: unknown): any {
+      const finalStatus = (status ?? 200) as ContractOperationStatusCodes<TOperation>;
+      const responseHeaders = headers ? new Headers(headers as HeadersInit) : new Headers();
+      if (!responseHeaders.has('Content-Type')) {
+        responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
+      }
+      return createResponse(finalStatus, html, responseHeaders) as ResponseVariant<
         TOperation,
         typeof finalStatus
       >;

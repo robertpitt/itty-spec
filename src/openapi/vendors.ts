@@ -1,10 +1,23 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { OpenAPIV3_1 } from './types';
+import { createRequire } from 'module';
 
 /**
  * Type for schema extraction functions
  */
 type SchemaExtractor = (schema: StandardSchemaV1) => OpenAPIV3_1.SchemaObject;
+
+/**
+ * Get a require function that works in both CommonJS and ES module environments
+ *
+ * Uses createRequire which works in both environments when import.meta.url is available.
+ * Since this package uses "type": "module", import.meta.url is always available.
+ */
+function getRequire(): NodeRequire {
+  // createRequire works in both CommonJS and ES module environments
+  // Since package.json has "type": "module", import.meta.url is always available
+  return createRequire(import.meta.url);
+}
 
 /**
  * Get zod module dynamically, trying multiple import strategies
@@ -18,10 +31,11 @@ function getZodModule(): any {
   const zodV4Path = 'zod' + '/v4';
   const zodPath = 'zod';
 
-  // Strategy 1: Try to use require (for CommonJS environments)
-  if (typeof require !== 'undefined') {
+  try {
+    const require = getRequire();
+
+    // Try zod/v4 first (zod v4) - using dynamic path to prevent bundling
     try {
-      // Try zod/v4 first (zod v4) - using dynamic path to prevent bundling
       const zodV4 = require(zodV4Path);
       if (zodV4 && typeof zodV4.toJSONSchema === 'function') {
         return zodV4;
@@ -30,32 +44,24 @@ function getZodModule(): any {
       // Fall through to try 'zod'
     }
 
-    try {
-      // Try 'zod' (might be v3 or v4) - using dynamic path to prevent bundling
-      const zod = require(zodPath);
-      if (zod && typeof zod.toJSONSchema === 'function') {
-        return zod;
-      }
-      // If zod exists but doesn't have toJSONSchema, it's probably v3
-      throw new Error(
-        'z.toJSONSchema() is not available. Please ensure you are using zod v4 or later.'
-      );
-    } catch (err: any) {
-      if (err.code === 'MODULE_NOT_FOUND') {
-        throw new Error(
-          'Zod is required for zod schema extraction. Please install zod: npm install zod'
-        );
-      }
-      // Re-throw if it's our custom error about missing toJSONSchema
-      throw err;
+    // Try 'zod' (might be v3 or v4) - using dynamic path to prevent bundling
+    const zod = require(zodPath);
+    if (zod && typeof zod.toJSONSchema === 'function') {
+      return zod;
     }
+    // If zod exists but doesn't have toJSONSchema, it's probably v3
+    throw new Error(
+      'z.toJSONSchema() is not available. Please ensure you are using zod v4 or later.'
+    );
+  } catch (err: any) {
+    if (err.code === 'MODULE_NOT_FOUND') {
+      throw new Error(
+        'Zod is required for zod schema extraction. Please install zod: npm install zod'
+      );
+    }
+    // Re-throw if it's our custom error about missing toJSONSchema
+    throw err;
   }
-
-  // Strategy 2: For ES modules, require is not available
-  // Users need to ensure zod is available in their environment
-  throw new Error(
-    'Zod must be available in your environment. For ES modules, ensure zod is installed and accessible: npm install zod'
-  );
 }
 
 /**
@@ -68,7 +74,7 @@ function extractZodSchema(schema: StandardSchemaV1): OpenAPIV3_1.SchemaObject {
   const z = getZodModule();
 
   // Get JSON Schema from zod using the static toJSONSchema method
-  const jsonSchema = z.toJSONSchema(schema);
+  const jsonSchema = z.toJSONSchema(schema, { io: 'input' });
 
   // Convert JSON Schema to OpenAPI SchemaObject
   return convertJsonSchemaToOpenAPI(jsonSchema);
