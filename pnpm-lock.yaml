@@ -20,6 +20,9 @@ importers:
       '@types/node':
         specifier: ^25.0.1
         version: 25.0.1
+      husky:
+        specifier: ^9.1.7
+        version: 9.1.7
       oxfmt:
         specifier: ^0.17.0
         version: 0.17.0
@@ -953,6 +956,14 @@ packages:
         integrity: sha512-Yc+BQe8SvoXH1643Qez1zqLRmbA5rCL+sSmk6TVos0LWVfNIB7PGncdlId77WzLGSIB5KaWgTaNTs2lNVEI6VQ==,
       }
 
+  husky@9.1.7:
+    resolution:
+      {
+        integrity: sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA==,
+      }
+    engines: { node: '>=18' }
+    hasBin: true
+
   import-without-cache@0.2.3:
     resolution:
       {
@@ -1719,6 +1730,8 @@ snapshots:
       resolve-pkg-maps: 1.0.0
 
   hookable@5.5.3: {}
+
+  husky@9.1.7: {}
 
   import-without-cache@0.2.3: {}
 

@@ -159,11 +159,11 @@ export const contractRouter = <
 
     // Use contract key as default operationId if not explicitly provided
     const operationId = operation.operationId ?? contractKey;
-    
+
     // Default method to 'GET' if not provided
     const method = (operation.method ?? 'GET').toLowerCase() as Lowercase<HttpMethod>;
     const path = operation.path;
-    
+
     // Create operation with defaults applied for middleware
     const operationWithDefaults = {
       ...operation,
