@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "build": "tsdown",
-    "format": "oxfmt",
+    "format": "oxfmt src/ examples/ tests/",
     "format:check": "oxfmt --check",
     "test": "vitest",
     "test:run": "vitest run",
