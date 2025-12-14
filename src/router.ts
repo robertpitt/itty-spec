@@ -51,7 +51,7 @@ import {
  *
  * @example
  * ```typescript
- * const router = contractRouter({
+ * const router = createRouter({
  *   contract: myContract,
  *   handlers: {
  *     getUsers: async (request) => {
@@ -61,7 +61,7 @@ import {
  * });
  * ```
  */
-export const contractRouter = <
+export const createRouter = <
   TContract extends ContractDefinition,
   RequestType extends IRequest = IRequest,
   Args extends any[] = any[],
