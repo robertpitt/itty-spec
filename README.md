@@ -92,10 +92,7 @@ const router = contractRouter({
       const { page, limit } = request.query;
 
       // Return typed response
-      return request.json({
-        users: ['alice', 'bob'],
-        total: 2,
-      }, 200);
+      return request.json({ users: [], total: 0 });
     },
     createUser: async (request) => {
       // request.body is fully typed and validated!
