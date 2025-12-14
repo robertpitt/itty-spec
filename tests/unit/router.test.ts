@@ -1,5 +1,6 @@
 import { test, expect } from 'vitest';
-import { createContract, createRouter } from '../../src/router.js';
+import { createRouter } from '../../src/router.js';
+import { createContract } from '../../src/contract.js';
 import type { ContractDefinition } from '../../src/types.js';
 import { z } from 'zod/v4';
 

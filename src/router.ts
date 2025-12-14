@@ -121,7 +121,7 @@ export const createRouter = <
       withBody(operationWithDefaults),
       withResponseHelpers(operationWithDefaults),
       async (request: IRequest, ...args: Args) =>
-        handler(request as unknown as ContractRequest<TContract[keyof TContract]>)
+        handler(request as ContractRequest<TContract[keyof TContract]>, ...args)
     );
   }
 

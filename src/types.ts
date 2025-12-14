@@ -339,7 +339,8 @@ export type ContractRequest<O extends ContractOperation> = ContractOperationRequ
  * Receives a typed request with response helpers
  */
 export type ContractOperationHandler<O extends ContractOperation> = (
-  request: ContractRequest<O>
+  request: ContractRequest<O>,
+  ...args: any[]
 ) => Promise<ContractOperationResponse<O>>;
 
 /**
