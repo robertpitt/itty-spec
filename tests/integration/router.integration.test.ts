@@ -23,7 +23,7 @@ test('Router Integration: GET request with query parameters should handle valida
     contract,
     handlers: {
       getCalculate: async (request) => {
-        const result = request.query.a + request.query.b;
+        const result = request.validatedQuery.a + request.validatedQuery.b;
         return result > 100
           ? request.error(400, { error: 'Invalid request' })
           : request.json({ result }, 200);
@@ -60,7 +60,7 @@ test('Router Integration: GET request with query parameters should return 400 fo
     contract,
     handlers: {
       getCalculate: async (request) => {
-        const result = request.query.a + request.query.b;
+        const result = request.validatedQuery.a + request.validatedQuery.b;
         return result > 100
           ? request.error(400, { error: 'Invalid request' })
           : request.json({ result }, 200);
@@ -97,7 +97,7 @@ test('Router Integration: POST request with body should handle validated body', 
     contract,
     handlers: {
       postCalculate: async (request) => {
-        const result = request.body.a + request.body.b;
+        const result = request.validatedBody.a + request.validatedBody.b;
         return result > 100
           ? request.error(400, { error: 'Invalid request' })
           : request.json({ result }, 200);
@@ -138,7 +138,7 @@ test('Router Integration: POST request with body should return 400 for invalid b
     contract,
     handlers: {
       postCalculate: async (request) => {
-        const result = request.body.a + request.body.b;
+        const result = request.validatedBody.a + request.validatedBody.b;
         return result > 100
           ? request.error(400, { error: 'Invalid request' })
           : request.json({ result }, 200);
@@ -281,7 +281,7 @@ test('Router Integration: Request with headers validation should handle request 
     contract,
     handlers: {
       getProtected: async (request) => {
-        const auth = request.headers.authorization;
+        const auth = request.validatedHeaders.authorization;
         if (auth === 'Bearer token123') {
           return request.json({ message: 'Access granted' }, 200);
         }
@@ -321,7 +321,7 @@ test('Router Integration: Error handling should handle validation errors gracefu
     contract,
     handlers: {
       postUser: async (request) => {
-        return request.json({ id: '1', name: request.body.name }, 201);
+        return request.json({ id: '1', name: request.validatedBody.name }, 201);
       },
     },
   });
@@ -377,7 +377,7 @@ test('Router Integration: Multiple operations should handle multiple operations 
         return request.json({ id: request.params.id, name: 'John' }, 200);
       },
       createUser: async (request) => {
-        return request.json({ id: '1', name: request.body.name }, 201);
+        return request.json({ id: '1', name: request.validatedBody.name }, 201);
       },
     },
   });
@@ -385,7 +385,7 @@ test('Router Integration: Multiple operations should handle multiple operations 
   // Test GET /users
   const listRequest = new Request('http://localhost:3000/users');
   const listResponse = await router.fetch(listRequest);
-  
+
   expect(listResponse.status).toBe(200);
 
   // Test GET /users/:id
@@ -405,4 +405,124 @@ test('Router Integration: Multiple operations should handle multiple operations 
   expect(createResponse.status).toBe(201);
   const createBody = await createResponse.json();
   expect(createBody).toEqual({ id: '1', name: 'Jane' });
+});
+
+test('Router Integration: Optional operationId should default to contract key', async () => {
+  const contract = createContract({
+    getUserProfile: {
+      // operationId omitted - should default to 'getUserProfile'
+      path: '/users/:id/profile',
+      // method omitted - should default to 'GET'
+      responses: {
+        200: { body: z.object({ id: z.string(), name: z.string() }) },
+      },
+    },
+  });
+
+  const router = contractRouter({
+    contract,
+    handlers: {
+      getUserProfile: async (request) => {
+        return request.json({ id: request.params.id, name: 'John Doe' }, 200);
+      },
+    },
+  });
+
+  const request = new Request('http://localhost:3000/users/123/profile');
+  const response = await router.fetch(request);
+
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body).toEqual({ id: '123', name: 'John Doe' });
+});
+
+test('Router Integration: Optional method should default to GET', async () => {
+  const contract = createContract({
+    listItems: {
+      operationId: 'listItems',
+      path: '/items',
+      // method omitted - should default to 'GET'
+      responses: {
+        200: { body: z.object({ items: z.array(z.string()) }) },
+      },
+    },
+  });
+
+  const router = contractRouter({
+    contract,
+    handlers: {
+      listItems: async (request) => {
+        return request.json({ items: ['item1', 'item2'] }, 200);
+      },
+    },
+  });
+
+  const request = new Request('http://localhost:3000/items');
+  const response = await router.fetch(request);
+
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body).toEqual({ items: ['item1', 'item2'] });
+});
+
+test('Router Integration: Explicit operationId should override contract key', async () => {
+  const contract = createContract({
+    getUserProfile: {
+      operationId: 'customOperationId', // Explicit operationId should override key
+      path: '/users/:id/profile',
+      responses: {
+        200: { body: z.object({ id: z.string(), name: z.string() }) },
+      },
+    },
+  });
+
+  const router = contractRouter({
+    contract,
+    handlers: {
+      getUserProfile: async (request) => {
+        return request.json({ id: request.params.id, name: 'John Doe' }, 200);
+      },
+    },
+  });
+
+  const request = new Request('http://localhost:3000/users/123/profile');
+  const response = await router.fetch(request);
+
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body).toEqual({ id: '123', name: 'John Doe' });
+});
+
+test('Router Integration: Explicit method should override default GET', async () => {
+  const contract = createContract({
+    createItem: {
+      operationId: 'createItem',
+      path: '/items',
+      method: 'POST', // Explicit method
+      request: z.object({ name: z.string() }),
+      responses: {
+        201: { body: z.object({ id: z.string(), name: z.string() }) },
+      },
+    },
+  });
+
+  const router = contractRouter({
+    contract,
+    handlers: {
+      createItem: async (request) => {
+        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+      },
+    },
+  });
+
+  const request = new Request('http://localhost:3000/items', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'New Item' }),
+  });
+  const response = await router.fetch(request);
+
+  expect(response.status).toBe(201);
+  const body = await response.json();
+  expect(body).toEqual({ id: '1', name: 'New Item' });
 });

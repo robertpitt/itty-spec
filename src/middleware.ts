@@ -1,5 +1,6 @@
 import type { IRequest, RequestHandler, ResponseHandler } from 'itty-router';
 import { error, json } from 'itty-router';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type {
   ContractOperation,
   ContractOperationParameters,
@@ -31,20 +32,20 @@ function normalizeHeaders(headers: unknown): Record<string, string> {
       // If the original had a different case, we can't recover it from Headers API
       headerMap.set(key.toLowerCase(), value);
     });
-    
+
     // Try to preserve original case by checking if we can get it from the headers object
     // This is a workaround for the Headers API limitation
     // We'll use the lowercase keys from Headers, but try to match against common header cases
     headerMap.forEach((value, lowerKey) => {
       // Common header cases to try
       const commonCases: Record<string, string> = {
-        'authorization': 'Authorization',
+        authorization: 'Authorization',
         'content-type': 'Content-Type',
         'content-length': 'Content-Length',
-        'accept': 'Accept',
+        accept: 'Accept',
         'user-agent': 'User-Agent',
       };
-      
+
       // Use common case if available, otherwise use lowercase
       const preservedKey = commonCases[lowerKey] || lowerKey;
       result[preservedKey] = value;
@@ -94,11 +95,11 @@ function extractPathParamsFromUrl(pathPattern: string, url: string): Record<stri
   const params: Record<string, string> = {};
   const urlObj = new URL(url);
   const pathname = urlObj.pathname;
-  
+
   // Split path pattern and actual pathname into segments
   const patternSegments = pathPattern.split('/').filter(Boolean);
   const pathSegments = pathname.split('/').filter(Boolean);
-  
+
   // Match segments and extract params
   for (let i = 0; i < patternSegments.length; i++) {
     const patternSegment = patternSegments[i];
@@ -109,7 +110,7 @@ function extractPathParamsFromUrl(pathPattern: string, url: string): Record<stri
       }
     }
   }
-  
+
   return params;
 }
 
@@ -120,28 +121,30 @@ export function withPathParams<TOperation extends ContractOperation>(
     // Get params from request if already extracted by withParams middleware
     let requestParams: Record<string, string> =
       (request.params as Record<string, string> | undefined) || {};
-    
+
     // If params are empty and we have a path pattern, extract them from URL
     if (Object.keys(requestParams).length === 0 && request.url) {
       requestParams = extractPathParamsFromUrl(operation.path, request.url);
     }
-    
+
     let params: Record<string, string> = {};
 
     if (operation.pathParams) {
       // If pathParams schema is provided, validate against it
       // Standard Schema validate returns a Result type with value or issues
-      const result = await operation.pathParams['~standard'].validate(requestParams);
-      
+      const schema = operation.pathParams as StandardSchemaV1;
+      const result = await schema['~standard'].validate(requestParams);
+
       // Check if validation failed (has issues property)
       if ('issues' in result && result.issues) {
         const error = new Error('Validation failed');
         (error as any).issues = result.issues;
         throw error;
       }
-      
+
       // Extract value from successful validation result
-      params = (result as { value: Record<string, string> }).value;
+      // TypeScript doesn't narrow the type properly, so we use a type assertion
+      params = ('value' in result ? result.value : result) as Record<string, string>;
     } else {
       // Otherwise, use params extracted from path
       params = requestParams;
@@ -192,34 +195,43 @@ export function withQueryParams<TOperation extends ContractOperation>(
     // Get query from request if already extracted
     let requestQuery: Record<string, unknown> =
       (request.query as Record<string, unknown> | undefined) || {};
-    
+
     // If query is empty and we have a URL, extract from URL
     if (Object.keys(requestQuery).length === 0 && request.url) {
       requestQuery = extractQueryParamsFromUrl(request.url);
     }
-    
+
     let query: Record<string, unknown> = {};
 
     if (operation.query) {
       // Standard Schema validate returns a Result type with value or issues
-      const result = await operation.query['~standard'].validate(requestQuery);
-      
+      const schema = operation.query as StandardSchemaV1;
+      const result = await schema['~standard'].validate(requestQuery);
+
       // Check if validation failed (has issues property)
       if ('issues' in result && result.issues) {
         const error = new Error('Validation failed');
         (error as any).issues = result.issues;
         throw error;
       }
-      
+
       // Extract value from successful validation result
-      query = (result as { value: Record<string, unknown> }).value;
+      // TypeScript doesn't narrow the type properly, so we use a type assertion
+      query = ('value' in result ? result.value : result) as Record<string, unknown>;
     } else {
       query = requestQuery;
     }
 
-    // Attach typed query to request
+    // Attach typed query to request as validatedQuery to avoid shadowing IRequest's query property
     // Type assertion is safe because we've validated against the schema
     // Use defineProperty to ensure the property can be set even if it already exists
+    Object.defineProperty(request, 'validatedQuery', {
+      value: query as ContractOperationQuery<TOperation>,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+    // Also mirror the validated query onto the standard query property for convenience
     Object.defineProperty(request, 'query', {
       value: query as ContractOperationQuery<TOperation>,
       writable: true,
@@ -272,26 +284,28 @@ export function withHeaders<TOperation extends ContractOperation>(
       const requestHeaders = normalizeHeadersForValidation(request.headers);
       // Validate against the contract schema
       // Standard Schema validate returns a Result type with value or issues
-      const result = await operation.headers['~standard'].validate(requestHeaders);
-      
+      const schema = operation.headers as StandardSchemaV1;
+      const result = await schema['~standard'].validate(requestHeaders);
+
       // Check if validation failed (has issues property)
       if ('issues' in result && result.issues) {
         const error = new Error('Validation failed');
         (error as any).issues = result.issues;
         throw error;
       }
-      
+
       // Extract value from successful validation result
-      headers = (result as { value: Record<string, unknown> }).value;
+      // TypeScript doesn't narrow the type properly, so we use a type assertion
+      headers = ('value' in result ? result.value : result) as Record<string, unknown>;
     } else {
       // If no headers schema, extract headers preserving case when possible
       headers = normalizeHeaders(request.headers);
     }
 
-    // Attach typed headers to request
+    // Attach typed headers to request as validatedHeaders to avoid shadowing IRequest's headers property
     // Type assertion is safe because we've validated against the schema
-    // Use defineProperty to override the read-only headers getter from native Request
-    Object.defineProperty(request, 'headers', {
+    // Use defineProperty to ensure the property can be set even if it already exists
+    Object.defineProperty(request, 'validatedHeaders', {
       value: headers as ContractOperationHeaders<TOperation>,
       writable: true,
       enumerable: true,
@@ -350,17 +364,19 @@ export function withBody<TOperation extends ContractOperation>(
       if (bodyReadSuccessfully) {
         // Validate against the contract schema
         // Standard Schema validate returns a Result type with value or issues
-        const result = await operation.request['~standard'].validate(bodyData);
-        
+        const schema = operation.request as StandardSchemaV1;
+        const result = await schema['~standard'].validate(bodyData);
+
         // Check if validation failed (has issues property)
         if ('issues' in result && result.issues) {
           const error = new Error('Validation failed');
           (error as any).issues = result.issues;
           throw error;
         }
-        
+
         // Extract value from successful validation result
-        body = result.value as ContractOperationBody<TOperation>;
+        // TypeScript doesn't narrow the type properly, so we use a type assertion
+        body = ('value' in result ? result.value : result) as ContractOperationBody<TOperation>;
       } else {
         // Body couldn't be read - set to empty object without validation
         // This allows handlers to check if body exists
@@ -368,10 +384,10 @@ export function withBody<TOperation extends ContractOperation>(
       }
     }
 
-    // Attach typed body to request
+    // Attach typed body to request as validatedBody to avoid shadowing IRequest's body property (ReadableStream)
     // Type assertion is safe because we've validated against the schema
     // Use defineProperty to ensure the property can be set even if it already exists
-    Object.defineProperty(request, 'body', {
+    Object.defineProperty(request, 'validatedBody', {
       value: body as ContractOperationBody<TOperation>,
       writable: true,
       enumerable: true,

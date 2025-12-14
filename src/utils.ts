@@ -1,10 +1,10 @@
 import type {
   ContractOperation,
-  ContractOperationResponse,
   ContractOperationStatusCodes,
   ContractOperationResponseBody,
   ContractOperationResponseHeaders,
   ContractOperationResponseHelpers,
+  ResponseVariant,
 } from './types';
 
 /**
@@ -70,14 +70,17 @@ export function createResponseHelpers<TOperation extends ContractOperation>(
      * @param headers - Optional response headers (must match contract schema if provided)
      * @returns A ContractOperationResponse object matching the contract
      */
-    json(body: unknown, status?: number, headers?: unknown): ContractOperationResponse<TOperation> {
+    json(body: unknown, status?: number, headers?: unknown): any {
       // Default to 200 if status is not provided
-      const finalStatus = status ?? 200;
-      return {
+      const finalStatus = (status ?? 200) as ContractOperationStatusCodes<TOperation>;
+      const response: any = {
         status: finalStatus,
         body,
-        ...(headers && { headers }),
-      } as ContractOperationResponse<TOperation>;
+      };
+      if (headers) {
+        response.headers = headers;
+      }
+      return response as ResponseVariant<TOperation, typeof finalStatus>;
     },
 
     /**
@@ -89,12 +92,12 @@ export function createResponseHelpers<TOperation extends ContractOperation>(
      */
     noContent<S extends ContractOperationStatusCodes<TOperation> & 204>(
       status: S
-    ): ContractOperationResponse<TOperation> {
+    ): ResponseVariant<TOperation, S> {
       // Type assertion is safe because S is constrained to 204 and ContractOperationStatusCodes
       return {
         status,
         body: undefined,
-      } as ContractOperationResponse<TOperation>;
+      } as ResponseVariant<TOperation, S>;
     },
 
     /**
@@ -110,12 +113,15 @@ export function createResponseHelpers<TOperation extends ContractOperation>(
       status: S,
       body: ContractOperationResponseBody<TOperation, S>,
       headers?: ContractOperationResponseHeaders<TOperation, S>
-    ): ContractOperationResponse<TOperation> {
-      return {
+    ): ResponseVariant<TOperation, S> {
+      const response: any = {
         status,
         body,
-        ...(headers && { headers }),
-      } as ContractOperationResponse<TOperation>;
+      };
+      if (headers) {
+        response.headers = headers;
+      }
+      return response as ResponseVariant<TOperation, S>;
     },
   };
 }

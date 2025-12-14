@@ -6,9 +6,7 @@ import { z } from 'zod/v4';
  */
 export const contract = createContract({
   getCalculate: {
-    operationId: 'helloWorld',
     path: '/calculate',
-    method: 'GET',
     headers: z.object({
       'Content-Type': z.literal('application/json'),
     }),
@@ -22,7 +20,6 @@ export const contract = createContract({
     },
   },
   postCalculate: {
-    operationId: 'postCalculate',
     path: '/calculate',
     method: 'POST',
     request: z.object({ a: z.number().min(0).max(100), b: z.number().min(0).max(100) }),

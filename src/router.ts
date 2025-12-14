@@ -7,7 +7,12 @@ import {
   type RequestHandler,
   type ResponseHandler,
 } from 'itty-router';
-import type { ContractDefinition, ContractRouterOptions, ContractRequest } from './types';
+import type {
+  ContractDefinition,
+  ContractRouterOptions,
+  ContractRequest,
+  HttpMethod,
+} from './types';
 import { createBasicResponseHelpers } from './utils';
 import {
   withContractOperation,
@@ -144,27 +149,37 @@ export const contractRouter = <
    * 5. withBody - Validates and attaches typed request body
    * 6. withResponseHelpers - Attaches typed response helper methods (json, error, noContent)
    */
-  for (const [operationId, operation] of Object.entries(options.contract)) {
-    const handler = options.handlers[operationId as keyof TContract];
+  for (const [contractKey, operation] of Object.entries(options.contract)) {
+    const handler = options.handlers[contractKey as keyof TContract];
 
     if (!handler) {
       // Skip operations without handlers
       continue;
     }
 
-    // Register route based on HTTP method
-    const method = operation.method.toLowerCase() as Lowercase<typeof operation.method>;
+    // Use contract key as default operationId if not explicitly provided
+    const operationId = operation.operationId ?? contractKey;
+    
+    // Default method to 'GET' if not provided
+    const method = (operation.method ?? 'GET').toLowerCase() as Lowercase<HttpMethod>;
     const path = operation.path;
+    
+    // Create operation with defaults applied for middleware
+    const operationWithDefaults = {
+      ...operation,
+      operationId,
+      method: operation.method ?? 'GET',
+    };
 
     // Create middleware chain for this operation
     // Order: operation → path params → query params → headers → body → response helpers
     const operationMiddleware = [
-      withContractOperation(operation),
-      withPathParams(operation),
-      withQueryParams(operation),
-      withHeaders(operation),
-      withBody(operation),
-      withResponseHelpers(operation),
+      withContractOperation(operationWithDefaults),
+      withPathParams(operationWithDefaults),
+      withQueryParams(operationWithDefaults),
+      withHeaders(operationWithDefaults),
+      withBody(operationWithDefaults),
+      withResponseHelpers(operationWithDefaults),
     ];
 
     /**
@@ -196,18 +211,39 @@ export const contractRouter = <
  * full type inference. While it currently just returns the definition as-is, it
  * provides a clear API for contract creation and allows for future validation logic.
  *
+ * **IMPORTANT**: For best type inference (especially for path parameter extraction),
+ * use ` when defining your contract:
+ *
+ * ```typescript
+ * const contract = createContract({
+ *   getUsers: {
+ *     operationId: 'getUsers',
+ *     path: '/users/:id',  // Path params will be extracted correctly
+ *     method: 'GET',
+ *     responses: { 200: { body: z.object({ users: z.array(z.string()) }) } },
+ *   },
+ * });
+ * ```
+ *
+ * Without `as const`, path parameter extraction may fall back to `EmptyObject`
+ * because template literal pattern matching only works with literal types.
+ *
  * @typeParam T - The contract definition type
  * @param definition - The contract definition mapping operation IDs to operations
  * @returns The same contract definition with full type inference
  *
  * @example
  * ```typescript
+ * import { createContract } from './router';
+ * import { z } from 'zod';
+ * import type { ContractDefinition } from './types';
+ *
  * const contract = createContract({
  *   getUsers: {
  *     operationId: 'getUsers',
- *     path: '/users',
+ *     path: '/users/:id',
  *     method: 'GET',
- *     responses: { 200: { body: z.object({ users: z.array(z.string()) } } },
+ *     responses: { 200: { body: z.object({ users: z.array(z.string()) }) } },
  *   },
  * });
  * ```

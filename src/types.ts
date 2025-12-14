@@ -7,6 +7,16 @@ import type { IRequest, RequestHandler, ResponseHandler } from 'itty-router';
 export type EmptyObject = Record<string, never>;
 
 /**
+ * Default query object type when no schema is provided
+ */
+type RawQuery = Record<string, string | string[] | undefined>;
+
+/**
+ * Default headers object type when no schema is provided
+ */
+type NormalizedHeaders = Record<string, string>;
+
+/**
  * Response schema structure with body and optional headers
  *
  * Note: `headers` being optional already expresses “no headers schema”.
@@ -25,35 +35,47 @@ export type ResponseSchema<
  * Validates that:
  * - If 200 is present, default is optional
  * - If 200 is not present, default is required (to encourage explicit status codes)
+ *
+ * Uses Partial<Record<number, ...>> instead of Record<number, ...> to preserve
+ * literal key types, allowing the `200 extends keyof T` check to work correctly.
  */
-export type ResponseSchemas<
-  T extends Record<number, ResponseSchema> & Partial<Record<'default', ResponseSchema>>,
-> = 200 extends keyof T
+type ResponseMap = Partial<Record<number, ResponseSchema>> & {
+  default?: ResponseSchema;
+};
+
+export type ResponseSchemas<T extends ResponseMap> = 200 extends keyof T
   ? T & Partial<Record<'default', ResponseSchema>>
-  : T & Record<'default', ResponseSchema>;
+  : T & Required<Pick<T, 'default'>>;
+
+/**
+ * HTTP method types
+ */
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
 
 /**
  * Contract operation definition
  *
  * TPath is generic to preserve literal path types (e.g., '/v1/applications/:id')
  * which is necessary for ExtractPathParams to work correctly.
+ *
+ * - `operationId` is optional - if omitted, the contract key will be used as the default
+ * - `method` is optional - if omitted, defaults to 'GET'
  */
 export type ContractOperation<
-  TPathParams extends StandardSchemaV1 | undefined = StandardSchemaV1 | undefined,
-  TQuery extends StandardSchemaV1 | undefined = StandardSchemaV1 | undefined,
-  TRequest extends StandardSchemaV1 | undefined = StandardSchemaV1 | undefined,
-  THeaders extends StandardSchemaV1 | undefined = StandardSchemaV1 | undefined,
-  TResponses extends Record<number, ResponseSchema> & Partial<Record<'default', ResponseSchema>> =
-    Record<number, ResponseSchema> & Partial<Record<'default', ResponseSchema>>,
+  TPathParams extends StandardSchemaV1 | undefined = undefined,
+  TQuery extends StandardSchemaV1 | undefined = undefined,
+  TRequest extends StandardSchemaV1 | undefined = undefined,
+  THeaders extends StandardSchemaV1 | undefined = undefined,
+  TResponses extends ResponseMap = ResponseMap,
   TPath extends string = string,
 > = {
-  operationId: string;
+  operationId?: string;
   description?: string;
   summary?: string;
   title?: string;
   tags?: string[];
   path: TPath;
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
+  method?: HttpMethod;
   pathParams?: TPathParams;
   query?: TQuery;
   request?: TRequest;
@@ -98,21 +120,27 @@ type MergeIntersection<T> = {
  * because template literal pattern matching only works with literal types.
  */
 export type ExtractPathParams<TPath extends string> =
-  // Handle paths starting with "/" - strip it and recurse
-  TPath extends `/${infer Rest}`
-    ? ExtractPathParams<Rest>
-    : // Match segment ending with "/" followed by rest
-      TPath extends `${infer Segment}/${infer Rest}`
-      ? Segment extends `:${infer Param}`
-        ? // Segment is a param (e.g., ":userId")
-          MergeIntersection<{ [K in Param]: string } & ExtractPathParams<Rest>>
-        : // Segment is not a param, recurse on rest
-          ExtractPathParams<Rest>
-      : // Match final segment (no trailing "/")
-        TPath extends `:${infer Param}`
-        ? { [K in Param]: string }
-        : // No match - empty object (also handles generic string type)
-          EmptyObject;
+  // Handle empty string - return EmptyObject
+  TPath extends ''
+    ? EmptyObject
+    : // Handle paths starting with "/" - strip it and recurse
+      TPath extends `/${infer Rest}`
+      ? ExtractPathParams<Rest>
+      : // Match segment ending with "/" followed by rest
+        TPath extends `${infer Segment}/${infer Rest}`
+        ? Segment extends `:${infer Param}`
+          ? // Segment is a param (e.g., ":userId")
+            MergeIntersection<{ [K in Param]: string } & ExtractPathParams<Rest>>
+          : // Segment is not a param, recurse on rest
+            ExtractPathParams<Rest>
+        : // Handle trailing slash on final segment - strip it and recurse
+          TPath extends `${infer Rest}/`
+          ? ExtractPathParams<Rest>
+          : // Match final segment (no trailing "/")
+            TPath extends `:${infer Param}`
+            ? { [K in Param]: string }
+            : // No match - empty object (also handles generic string type)
+              EmptyObject;
 
 /**
  * Normalize `{}` (no keys) into `EmptyObject` for consistency.
@@ -128,12 +156,13 @@ type NormalizeEmpty<T> = keyof MergeIntersection<T> extends never
  *
  * IMPORTANT: because `pathParams` is optional, we must check if it exists
  * before trying to infer its output type.
+ * With the updated defaults, omitted properties are `undefined`, so we check for `undefined` explicitly.
  */
 export type ContractOperationParameters<O extends ContractOperation<any, any, any, any, any, any>> =
-  NonNullable<O['pathParams']> extends never
+  O['pathParams'] extends undefined
     ? NormalizeEmpty<ExtractPathParams<O['path']>>
-    : NonNullable<O['pathParams']> extends StandardSchemaV1
-      ? StandardSchemaV1.InferOutput<NonNullable<O['pathParams']>>
+    : O['pathParams'] extends StandardSchemaV1
+      ? StandardSchemaV1.InferOutput<O['pathParams']>
       : NormalizeEmpty<ExtractPathParams<O['path']>>;
 
 /**
@@ -141,39 +170,42 @@ export type ContractOperationParameters<O extends ContractOperation<any, any, an
  *
  * IMPORTANT: because `query` is optional, we must check if it exists
  * before trying to infer its output type.
+ * With the updated defaults, omitted properties are `undefined`, so we check for `undefined` explicitly.
  */
 export type ContractOperationQuery<O extends ContractOperation<any, any, any, any, any, any>> =
-  NonNullable<O['query']> extends never
-    ? EmptyObject
-    : NonNullable<O['query']> extends StandardSchemaV1
-      ? StandardSchemaV1.InferOutput<NonNullable<O['query']>>
-      : EmptyObject;
+  O['query'] extends undefined
+    ? RawQuery
+    : O['query'] extends StandardSchemaV1
+      ? StandardSchemaV1.InferOutput<O['query']>
+      : RawQuery;
 
 /**
  * Extract body type from a contract operation
  *
  * IMPORTANT: because `request` is optional, we must check if it exists
  * before trying to infer its output type.
+ * With the updated defaults, omitted properties are `undefined`, so we check for `undefined` explicitly.
  */
 export type ContractOperationBody<O extends ContractOperation<any, any, any, any, any, any>> =
-  NonNullable<O['request']> extends never
-    ? never
-    : NonNullable<O['request']> extends StandardSchemaV1
-      ? StandardSchemaV1.InferOutput<NonNullable<O['request']>>
-      : never;
+  O['request'] extends undefined
+    ? undefined
+    : O['request'] extends StandardSchemaV1
+      ? StandardSchemaV1.InferOutput<O['request']>
+      : undefined;
 
 /**
  * Extract headers type from a contract operation
  *
  * IMPORTANT: because `headers` is optional, we must check if it exists
  * before trying to infer its output type.
+ * With the updated defaults, omitted properties are `undefined`, so we check for `undefined` explicitly.
  */
 export type ContractOperationHeaders<O extends ContractOperation<any, any, any, any, any, any>> =
-  NonNullable<O['headers']> extends never
-    ? EmptyObject
-    : NonNullable<O['headers']> extends StandardSchemaV1
-      ? StandardSchemaV1.InferOutput<NonNullable<O['headers']>>
-      : EmptyObject;
+  O['headers'] extends undefined
+    ? NormalizedHeaders
+    : O['headers'] extends StandardSchemaV1
+      ? StandardSchemaV1.InferOutput<O['headers']>
+      : NormalizedHeaders;
 
 // ============================================================================
 // Router Types
@@ -182,13 +214,18 @@ export type ContractOperationHeaders<O extends ContractOperation<any, any, any, 
 /**
  * Contract operation request type that extends IRequest with typed params, query, body, and headers
  * This aligns with itty-router's pattern where handlers receive a typed request
+ *
+ * Note: We use `validatedBody`, `validatedHeaders`, and `validatedQuery` to avoid shadowing
+ * IRequest's native `body` (ReadableStream) and `headers` (Headers object) properties.
+ * The `params` property is kept as-is since it's standard in itty-router.
  */
 export type ContractOperationRequest<O extends ContractOperation<any, any, any, any, any, any>> =
   IRequest & {
     params: ContractOperationParameters<O>;
     query: ContractOperationQuery<O>;
-    body: ContractOperationBody<O>;
-    headers: ContractOperationHeaders<O>;
+    validatedQuery: ContractOperationQuery<O>;
+    validatedBody: ContractOperationBody<O>;
+    validatedHeaders: ContractOperationHeaders<O>;
   };
 
 /**
@@ -239,6 +276,15 @@ export type ContractOperationResponseHeaders<
     : never;
 
 /**
+ * Extract a specific response variant from the union by status code
+ * This allows response helpers to return discriminated variants instead of the full union
+ */
+export type ResponseVariant<
+  O extends ContractOperation,
+  S extends ContractOperationStatusCodes<O>,
+> = Extract<ContractOperationResponse<O>, { status: S }>;
+
+/**
  * Typed response helper methods attached to the request object
  */
 export type ContractOperationResponseHelpers<O extends ContractOperation> = {
@@ -256,21 +302,19 @@ export type ContractOperationResponseHelpers<O extends ContractOperation> = {
     headers?: 200 extends ContractOperationStatusCodes<O>
       ? ContractOperationResponseHeaders<O, 200>
       : never
-  ): ContractOperationResponse<O>;
+  ): ResponseVariant<O, 200>;
   // Overload: when status is provided explicitly
   json<S extends ContractOperationStatusCodes<O>>(
     body: ContractOperationResponseBody<O, S>,
     status: S,
     headers?: ContractOperationResponseHeaders<O, S>
-  ): ContractOperationResponse<O>;
+  ): ResponseVariant<O, S>;
 
   /**
    * Create a no-content response (204)
    * Validates that 204 is a valid status code in the contract
    */
-  noContent<S extends ContractOperationStatusCodes<O> & 204>(
-    status: S
-  ): ContractOperationResponse<O>;
+  noContent<S extends ContractOperationStatusCodes<O> & 204>(status: S): ResponseVariant<O, S>;
 
   /**
    * Create an error response with typed body and status code
@@ -280,7 +324,7 @@ export type ContractOperationResponseHelpers<O extends ContractOperation> = {
     status: S,
     body: ContractOperationResponseBody<O, S>,
     headers?: ContractOperationResponseHeaders<O, S>
-  ): ContractOperationResponse<O>;
+  ): ResponseVariant<O, S>;
 };
 
 /**

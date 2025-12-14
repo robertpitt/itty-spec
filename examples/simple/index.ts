@@ -5,13 +5,13 @@ const router = contractRouter({
   contract,
   handlers: {
     getCalculate: async (request) => {
-      const result = request.query.a + request.query.b;
+      const result = request.validatedQuery.a + request.validatedQuery.b;
       return result > 100
         ? request.json({ error: 'Invalid request' }, 400)
         : request.json({ result: result }, 200);
     },
     postCalculate: async (request) => {
-      const result = request.body.a + request.body.b;
+      const result = request.validatedBody.a + request.validatedBody.b;
       return result > 100
         ? request.json({ error: 'Invalid request' }, 400)
         : request.json({ result: result }, 200);
