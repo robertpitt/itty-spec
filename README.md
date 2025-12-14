@@ -80,11 +80,11 @@ const contract = createContract({
 2. Next we can create a router that provides an implementation for the contract
 
 ```typescript
-import { contractRouter } from 'itty-spec';
+import { createRouter  } from 'itty-spec';
 import { contract } from "./contract"
 
 // Create a router with type-safe handlers
-const router = contractRouter({
+const router = createRouter({
   contract,
   handlers: {
     getUsers: async (request) => {
