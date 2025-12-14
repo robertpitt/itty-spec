@@ -1,5 +1,6 @@
 import { test, expect } from 'vitest';
-import { createContract, createRouter } from '../../src/router.js';
+import { createRouter } from '../../src/router.js';
+import { createContract } from '../../src/contract.js';
 import { z } from 'zod/v4';
 
 test('GET request with query parameters should handle validated query parameters', async () => {
@@ -1453,7 +1454,7 @@ test('Custom missing handler should handle 404 routes', async () => {
     contract,
     missing: async (request) => {
       // Request object may have url property or we can construct it
-      const url = (request as any).url || (request as Request).url || 'unknown';
+      const url = request.proxy?.url;
       return request.json({ error: 'Custom 404: Route not found', url }, 404);
     },
     handlers: {
@@ -1468,6 +1469,10 @@ test('Custom missing handler should handle 404 routes', async () => {
 
   expect(response.status).toBe(404);
   const body = await response.json();
+  expect(body).toEqual({
+    error: 'Custom 404: Route not found',
+    url: 'http://localhost:3000/nonexistent',
+  });
   expect(body.error).toBe('Custom 404: Route not found');
   // URL should be present in the response
   expect(body.url).toBeDefined();
@@ -1480,7 +1485,7 @@ test('Before middleware should run before handlers', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { body: z.object({ users: z.array(z.string()), requestId: z.string() }) },
       },
     },
   });
@@ -1766,7 +1771,7 @@ test('Handler throwing errors should be handled gracefully', async () => {
   const router = createRouter({
     contract,
     handlers: {
-      getUsers: async (request) => {
+      getUsers: async () => {
         throw new Error('Internal server error');
       },
     },
@@ -2129,11 +2134,11 @@ test('Query parameter transformations should handle complex transforms', async (
         page: z
           .string()
           .transform((val) => parseInt(val, 10))
-          .default('1'),
+          .default(1),
         limit: z
           .string()
           .transform((val) => Math.min(parseInt(val, 10), 100))
-          .default('10'),
+          .default(10),
         includeDeleted: z
           .string()
           .transform((val) => val === 'true')
