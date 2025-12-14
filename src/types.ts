@@ -310,6 +310,13 @@ export type ContractOperationResponseHelpers<O extends ContractOperation> = {
     headers?: ContractOperationResponseHeaders<O, S>
   ): ResponseVariant<O, S>;
 
+  html(html: string, status?: number, headers?: unknown): ResponseVariant<O, 200>;
+  html<S extends ContractOperationStatusCodes<O>>(
+    html: string,
+    status: S,
+    headers?: ContractOperationResponseHeaders<O, S>
+  ): ResponseVariant<O, S>;
+
   /**
    * Create a no-content response (204)
    * Validates that 204 is a valid status code in the contract
@@ -339,7 +346,8 @@ export type ContractRequest<O extends ContractOperation> = ContractOperationRequ
  * Receives a typed request with response helpers
  */
 export type ContractOperationHandler<O extends ContractOperation> = (
-  request: ContractRequest<O>
+  request: ContractRequest<O>,
+  ...args: any[]
 ) => Promise<ContractOperationResponse<O>>;
 
 /**
