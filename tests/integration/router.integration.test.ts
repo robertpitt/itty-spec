@@ -384,8 +384,14 @@ test('Query parameter validation should return 400 for invalid type', async () =
       path: '/items',
       method: 'GET',
       query: z.object({
-        page: z.string().regex(/^\d+$/).transform((val) => parseInt(val, 10)),
-        limit: z.string().regex(/^\d+$/).transform((val) => parseInt(val, 10)),
+        page: z
+          .string()
+          .regex(/^\d+$/)
+          .transform((val) => parseInt(val, 10)),
+        limit: z
+          .string()
+          .regex(/^\d+$/)
+          .transform((val) => parseInt(val, 10)),
       }),
       responses: {
         200: { body: z.object({ items: z.array(z.string()) }) },
