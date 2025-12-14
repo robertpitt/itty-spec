@@ -6,6 +6,16 @@ import type {
   ContractOperationResponseHelpers,
   ResponseVariant,
 } from './types';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
+
+/**
+ * Create a response object with optional headers
+ */
+function createResponse(status: number, body: unknown, headers?: unknown) {
+  const response: any = { status, body };
+  if (headers) response.headers = headers;
+  return response;
+}
 
 /**
  * Basic response helper methods for use in missing handlers
@@ -15,36 +25,11 @@ import type {
  */
 export function createBasicResponseHelpers() {
   return {
-    /**
-     * Create a JSON response
-     * @param body - Response body
-     * @param status - HTTP status code
-     * @param headers - Optional response headers
-     */
-    json: (body: unknown, status: number, headers?: HeadersInit) => ({
-      status,
-      body,
-      ...(headers && { headers }),
-    }),
-    /**
-     * Create a no-content response (typically 204)
-     * @param status - HTTP status code (should be 204)
-     */
-    noContent: (status: number) => ({
-      status,
-      body: undefined,
-    }),
-    /**
-     * Create an error response
-     * @param status - HTTP status code
-     * @param body - Error response body
-     * @param headers - Optional response headers
-     */
-    error: (status: number, body: unknown, headers?: HeadersInit) => ({
-      status,
-      body,
-      ...(headers && { headers }),
-    }),
+    json: (body: unknown, status: number, headers?: HeadersInit): Response =>
+      createResponse(status, body, headers),
+    noContent: (status: number): Response => createResponse(status, undefined),
+    error: (status: number, body: unknown, headers?: HeadersInit): Response =>
+      createResponse(status, body, headers),
   };
 }
 
@@ -59,69 +44,45 @@ export function createResponseHelpers<TOperation extends ContractOperation>(
   _operation: TOperation
 ): ContractOperationResponseHelpers<TOperation> {
   return {
-    /**
-     * Create a JSON response with typed body and status code
-     * Supports two overloads:
-     * 1. When status is omitted, defaults to 200 (if 200 is a valid status code)
-     * 2. When status is provided explicitly, validates against contract
-     *
-     * @param body - Response body (must match the contract schema for the status code)
-     * @param status - HTTP status code (optional, defaults to 200)
-     * @param headers - Optional response headers (must match contract schema if provided)
-     * @returns A ContractOperationResponse object matching the contract
-     */
     json(body: unknown, status?: number, headers?: unknown): any {
-      // Default to 200 if status is not provided
       const finalStatus = (status ?? 200) as ContractOperationStatusCodes<TOperation>;
-      const response: any = {
-        status: finalStatus,
-        body,
-      };
-      if (headers) {
-        response.headers = headers;
-      }
-      return response as ResponseVariant<TOperation, typeof finalStatus>;
+      return createResponse(finalStatus, body, headers) as ResponseVariant<
+        TOperation,
+        typeof finalStatus
+      >;
     },
-
-    /**
-     * Create a no-content response (204)
-     * Validates that 204 is a valid status code in the contract
-     *
-     * @param status - HTTP status code (must be 204 and valid in contract)
-     * @returns A ContractOperationResponse object with no body
-     */
     noContent<S extends ContractOperationStatusCodes<TOperation> & 204>(
       status: S
     ): ResponseVariant<TOperation, S> {
-      // Type assertion is safe because S is constrained to 204 and ContractOperationStatusCodes
-      return {
-        status,
-        body: undefined,
-      } as ResponseVariant<TOperation, S>;
+      return createResponse(status, undefined) as ResponseVariant<TOperation, S>;
     },
-
-    /**
-     * Create an error response with typed body and status code
-     * Validates that the status code exists in the contract and body matches the schema
-     *
-     * @param status - HTTP status code (must be valid in contract)
-     * @param body - Error response body (must match contract schema for this status)
-     * @param headers - Optional response headers (must match contract schema if provided)
-     * @returns A ContractOperationResponse object matching the contract
-     */
     error<S extends ContractOperationStatusCodes<TOperation>>(
       status: S,
       body: ContractOperationResponseBody<TOperation, S>,
       headers?: ContractOperationResponseHeaders<TOperation, S>
     ): ResponseVariant<TOperation, S> {
-      const response: any = {
-        status,
-        body,
-      };
-      if (headers) {
-        response.headers = headers;
-      }
-      return response as ResponseVariant<TOperation, S>;
+      return createResponse(status, body, headers) as ResponseVariant<TOperation, S>;
     },
   };
+}
+
+/**
+ * Validate data against a Standard Schema and extract the value
+ * Throws validation error if validation fails
+ */
+export async function validateSchema<T>(schema: StandardSchemaV1, data: unknown): Promise<T> {
+  const result = await schema['~standard'].validate(data);
+  if ('issues' in result && result.issues) {
+    const error = new Error('Validation failed');
+    (error as any).issues = result.issues;
+    throw error;
+  }
+  return ('value' in result ? result.value : result) as T;
+}
+
+/**
+ * Define a property on an object with standard configuration
+ */
+export function defineProp<T>(obj: any, key: string, value: T): void {
+  Object.defineProperty(obj, key, { value, writable: true, enumerable: true, configurable: true });
 }
