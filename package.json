@@ -5,18 +5,25 @@
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts",
+  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/index.d.mts",
-        "default": "./dist/index.mjs"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
-      }
-    }
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.mjs"
+    },
+    "./contract": {
+      "require": "./dist/contract.cjs",
+      "import": "./dist/contract.mjs"
+    },
+    "./openapi": {
+      "require": "./dist/openapi/index.cjs",
+      "import": "./dist/openapi/index.mjs"
+    },
+    "./router": {
+      "require": "./dist/router.cjs",
+      "import": "./dist/router.mjs"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
