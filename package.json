@@ -1,7 +1,7 @@
 {
   "name": "itty-spec",
   "version": "0.1.0",
-  "description": "",
+  "description": "Type-safe contract first itty-router",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -49,7 +49,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git@robertpitt1988:robertpitt/itty-spec.git"
+    "url": "git@github.com:robertpitt/itty-spec.git"
   },
   "publishConfig": {
     "access": "public"
