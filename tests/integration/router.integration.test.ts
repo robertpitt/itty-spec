@@ -1454,7 +1454,7 @@ test('Custom missing handler should handle 404 routes', async () => {
     contract,
     missing: async (request) => {
       // Request object may have url property or we can construct it
-      const url = request.url;
+      const url = request.proxy?.url;
       return request.json({ error: 'Custom 404: Route not found', url }, 404);
     },
     handlers: {
@@ -1469,6 +1469,10 @@ test('Custom missing handler should handle 404 routes', async () => {
 
   expect(response.status).toBe(404);
   const body = await response.json();
+  expect(body).toEqual({
+    error: 'Custom 404: Route not found',
+    url: 'http://localhost:3000/nonexistent',
+  });
   expect(body.error).toBe('Custom 404: Route not found');
   // URL should be present in the response
   expect(body.url).toBeDefined();
