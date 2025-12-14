@@ -29,6 +29,24 @@ pnpm add itty-spec
 import { createContract } from 'itty-spec';
 import { z } from 'zod';
 
+const UserEntity = z.object({
+  id: z.uuid(),
+  name: z.string().min(1),
+  email: z.string().email(),
+  age: z.number().min(18).optional(),
+})
+
+const CreateUserRequest = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  age: z.number().min(18).optional(),
+})
+
+const ListUsersResponse = z.object({
+  users: z.array(UserEntity),
+  total: z.number()
+})
+
 // Define your API contract
 const contract = createContract({
   getUsers: {
@@ -41,12 +59,7 @@ const contract = createContract({
       limit: z.number().min(1).max(100).default(10),
     }),
     responses: {
-      200: {
-        body: z.object({
-          users: z.array(z.object()),
-          total: z.number()
-        })
-      },
+      200: { body: ListUsersResponse },
     },
   },
   createUser: {
@@ -55,20 +68,9 @@ const contract = createContract({
     headers: z.object({
       'x-api-key': z.string(),
     }),
-    body: z.object({
-      name: z.string().min(1),
-      email: z.string().email(),
-      age: z.number().min(18).optional(),
-    }),
+    body: CreateUserRequest,
     response: {
-      200: {
-        body: z.object({
-          id: z.uuid(),
-          name: z.string().min(1),
-          email: z.string().email(),
-          age: z.number().min(18).optional(),
-        })
-      },
+      200: { body: UserEntity },
       400: { body: z.object({ error: z.string() }) },
     }
   }
