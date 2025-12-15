@@ -2053,8 +2053,8 @@ test('Multiple headers validation should handle case-insensitive headers', async
       responses: {
         200: {
           'application/json': { body: z.object({ message: z.string() }) },
-          401: { 'application/json': { body: z.object({ error: z.string() }) } },
         },
+        401: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -2105,11 +2105,11 @@ test('Response headers should be set correctly', async () => {
         200: {
           'application/json': {
             body: z.object({ users: z.array(z.string()) }),
+            headers: z.object({
+              'X-Total-Count': z.string().optional(),
+              'Cache-Control': z.string().optional(),
+            }),
           },
-          headers: z.object({
-            'X-Total-Count': z.string().optional(),
-            'Cache-Control': z.string().optional(),
-          }),
         },
       },
     },

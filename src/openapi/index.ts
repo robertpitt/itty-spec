@@ -164,27 +164,12 @@ function collectSchemasFromOperation(
   registry: SchemaRegistry,
   operationId: string
 ): void {
-  // Path parameters
-  if (operation.pathParams) {
-    getOrCreateSchemaReference(operation.pathParams, registry, `${operationId}PathParams`);
-  }
-
-  // Query parameters
-  if (operation.query) {
-    getOrCreateSchemaReference(operation.query, registry, `${operationId}Query`);
-  }
-
   // Request body
   if (operation.request) {
     getOrCreateSchemaReference(operation.request, registry, `${operationId}Request`);
   }
 
-  // Request headers
-  if (operation.headers) {
-    getOrCreateSchemaReference(operation.headers, registry, `${operationId}Headers`);
-  }
-
-  // Response schemas
+  // Response body schemas only (headers, path params, and query params are inlined)
   if (operation.responses) {
     for (const [statusCode, response] of Object.entries(operation.responses)) {
       if (!response || typeof response !== 'object') continue;
@@ -198,13 +183,6 @@ function collectSchemasFromOperation(
               responseSchema.body,
               registry,
               `${operationId}Response${statusCode}${contentType.replace(/[^a-zA-Z0-9]/g, '')}Body`
-            );
-          }
-          if (responseSchema.headers) {
-            getOrCreateSchemaReference(
-              responseSchema.headers,
-              registry,
-              `${operationId}Response${statusCode}${contentType.replace(/[^a-zA-Z0-9]/g, '')}Headers`
             );
           }
         }
@@ -268,17 +246,10 @@ function createOpenApiOperation(
   const pathParamNames = extractPathParamNames(operation.path);
 
   if (pathParamNames.length > 0) {
-    // If pathParams schema exists, use it to get schemas for each param
+    // If pathParams schema exists, extract it directly (don't register as component)
     let pathParamsSchema: OpenAPIV3_1.SchemaObject | null = null;
     if (operation.pathParams) {
-      const schemaId = getOrCreateSchemaReference(
-        operation.pathParams,
-        registry,
-        `${operationId}PathParams`
-      );
-      if (schemaId && registry.schemas[schemaId]) {
-        pathParamsSchema = registry.schemas[schemaId];
-      }
+      pathParamsSchema = extractSchema(operation.pathParams);
     }
 
     // Create path parameters for each param found in the path
@@ -313,21 +284,19 @@ function createOpenApiOperation(
 
   // Query parameters
   if (operation.query) {
-    const schemaId = getOrCreateSchemaReference(operation.query, registry, `${operationId}Query`);
-    if (schemaId && registry.schemas[schemaId]) {
-      const schema = registry.schemas[schemaId];
-      // Extract properties from schema and create query parameters
-      if (schema.properties) {
-        const requiredFields = schema.required || [];
-        for (const [paramName, paramSchema] of Object.entries(schema.properties)) {
-          parameters.push({
-            name: paramName,
-            in: 'query',
-            required: requiredFields.includes(paramName),
-            schema: paramSchema as OpenAPIV3_1.SchemaObject,
-            description: (paramSchema as OpenAPIV3_1.SchemaObject).description,
-          });
-        }
+    // Extract schema directly (don't register as component)
+    const schema = extractSchema(operation.query);
+    // Extract properties from schema and create query parameters
+    if (schema.properties) {
+      const requiredFields = schema.required || [];
+      for (const [paramName, paramSchema] of Object.entries(schema.properties)) {
+        parameters.push({
+          name: paramName,
+          in: 'query',
+          required: requiredFields.includes(paramName),
+          schema: paramSchema as OpenAPIV3_1.SchemaObject,
+          description: (paramSchema as OpenAPIV3_1.SchemaObject).description,
+        });
       }
     }
   }
@@ -359,28 +328,22 @@ function createOpenApiOperation(
   // Request headers (OpenAPI doesn't have a standard way to document headers in requestBody,
   // but we can add them as parameters with in: 'header')
   if (operation.headers) {
-    const schemaId = getOrCreateSchemaReference(
-      operation.headers,
-      registry,
-      `${operationId}Headers`
-    );
-    if (schemaId && registry.schemas[schemaId]) {
-      const schema = registry.schemas[schemaId];
-      if (schema.properties) {
-        const headerParams: OpenAPIV3_1.ParameterObject[] = [];
-        const requiredFields = schema.required || [];
-        for (const [headerName, headerSchema] of Object.entries(schema.properties)) {
-          headerParams.push({
-            name: headerName,
-            in: 'header',
-            required: requiredFields.includes(headerName),
-            schema: headerSchema as OpenAPIV3_1.SchemaObject,
-            description: (headerSchema as OpenAPIV3_1.SchemaObject).description,
-          });
-        }
-        if (headerParams.length > 0) {
-          operationObj.parameters = [...(operationObj.parameters || []), ...headerParams];
-        }
+    // Extract schema directly (don't register as component)
+    const schema = extractSchema(operation.headers);
+    if (schema.properties) {
+      const headerParams: OpenAPIV3_1.ParameterObject[] = [];
+      const requiredFields = schema.required || [];
+      for (const [headerName, headerSchema] of Object.entries(schema.properties)) {
+        headerParams.push({
+          name: headerName,
+          in: 'header',
+          required: requiredFields.includes(headerName),
+          schema: headerSchema as OpenAPIV3_1.SchemaObject,
+          description: (headerSchema as OpenAPIV3_1.SchemaObject).description,
+        });
+      }
+      if (headerParams.length > 0) {
+        operationObj.parameters = [...(operationObj.parameters || []), ...headerParams];
       }
     }
   }
@@ -424,25 +387,18 @@ function createOpenApiOperation(
           }
         }
 
-        // Response headers schema (per content type)
+        // Response headers schema (per content type) - inline directly
         if (responseSchema.headers) {
-          const contentTypeSafe = contentType.replace(/[^a-zA-Z0-9]/g, '');
-          const headersSchemaId = getOrCreateSchemaReference(
-            responseSchema.headers,
-            registry,
-            `${operationId}Response${statusCode}${contentTypeSafe}Headers`
-          );
-          if (headersSchemaId && registry.schemas[headersSchemaId]) {
-            const headersSchema = registry.schemas[headersSchemaId];
-            if (headersSchema.properties) {
-              // Headers are shared across all content types in OpenAPI, so we merge them
-              // If there are conflicts, the last one wins
-              for (const [headerName, headerSchema] of Object.entries(headersSchema.properties)) {
-                allHeaders[headerName] = {
-                  schema: headerSchema as OpenAPIV3_1.SchemaObject,
-                  description: (headerSchema as OpenAPIV3_1.SchemaObject).description,
-                };
-              }
+          // Extract schema directly (don't register as component)
+          const headersSchema = extractSchema(responseSchema.headers);
+          if (headersSchema.properties) {
+            // Headers are shared across all content types in OpenAPI, so we merge them
+            // If there are conflicts, the last one wins
+            for (const [headerName, headerSchema] of Object.entries(headersSchema.properties)) {
+              allHeaders[headerName] = {
+                schema: headerSchema as OpenAPIV3_1.SchemaObject,
+                description: (headerSchema as OpenAPIV3_1.SchemaObject).description,
+              };
             }
           }
         }

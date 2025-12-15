@@ -74,7 +74,7 @@ function extractZodSchema(schema: StandardSchemaV1): OpenAPIV3_1.SchemaObject {
   const z = getZodModule();
 
   // Get JSON Schema from zod using the static toJSONSchema method
-  const jsonSchema = z.toJSONSchema(schema, { io: 'input' });
+  const jsonSchema = z.toJSONSchema(schema, { io: 'input', target: 'openapi-3.0', reused: 'ref' });
 
   // Convert JSON Schema to OpenAPI SchemaObject
   return convertJsonSchemaToOpenAPI(jsonSchema);

@@ -106,14 +106,32 @@ export const contract = createContract({
     query: CalculateRequest,
     responses: {
       200: {
-        'application/json': { body: CalculateResponse },
-        'text/html': { body: CalculateResponseHTML },
-        'application/xml': { body: CalculateResponseXML },
+        'application/json': {
+          body: CalculateResponse,
+          headers: z.object({ 'Content-Type': z.literal('application/json') }),
+        },
+        'text/html': {
+          body: CalculateResponseHTML,
+          headers: z.object({ 'Content-Type': z.literal('text/html') }),
+        },
+        'application/xml': {
+          body: CalculateResponseXML,
+          headers: z.object({ 'Content-Type': z.literal('application/xml') }),
+        },
       },
       400: {
-        'application/json': { body: CalculateError },
-        'text/html': { body: CalculateErrorHTML },
-        'application/xml': { body: CalculateErrorXML },
+        'application/json': {
+          body: CalculateError,
+          headers: z.object({ 'Content-Type': z.literal('application/json') }),
+        },
+        'text/html': {
+          body: CalculateErrorHTML,
+          headers: z.object({ 'Content-Type': z.literal('text/html') }),
+        },
+        'application/xml': {
+          body: CalculateErrorXML,
+          headers: z.object({ 'Content-Type': z.literal('application/xml') }),
+        },
       },
     },
     tags: ['Calculate API'],
