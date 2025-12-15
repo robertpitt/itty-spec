@@ -19,7 +19,7 @@ type NormalizedHeaders = Record<string, string>;
 /**
  * Response schema structure with body and optional headers
  *
- * Note: `headers` being optional already expresses “no headers schema”.
+ * Note: `headers` being optional already expresses "no headers schema".
  */
 export type ResponseSchema<
   TBody extends StandardSchemaV1 = StandardSchemaV1,
@@ -30,7 +30,18 @@ export type ResponseSchema<
 };
 
 /**
+ * Response schemas mapped by content type
+ * Allows different schemas for different content types (e.g., JSON, HTML, XML)
+ */
+export type ResponseByContentType = {
+  [contentType: string]: ResponseSchema;
+};
+
+/**
  * Response schemas mapped by status code.
+ *
+ * Each status code must use a content-type map format:
+ * `{ 'application/json': { body: Schema }, 'text/html': { body: Schema } }`
  *
  * Validates that:
  * - If 200 is present, default is optional
@@ -39,12 +50,12 @@ export type ResponseSchema<
  * Uses Partial<Record<number, ...>> instead of Record<number, ...> to preserve
  * literal key types, allowing the `200 extends keyof T` check to work correctly.
  */
-type ResponseMap = Partial<Record<number, ResponseSchema>> & {
-  default?: ResponseSchema;
+type ResponseMap = Partial<Record<number, ResponseByContentType>> & {
+  default?: ResponseByContentType;
 };
 
 export type ResponseSchemas<T extends ResponseMap> = 200 extends keyof T
-  ? T & Partial<Record<'default', ResponseSchema>>
+  ? T & Partial<Record<'default', ResponseByContentType>>
   : T & Required<Pick<T, 'default'>>;
 
 /**
@@ -229,19 +240,39 @@ export type ContractOperationRequest<O extends ContractOperation<any, any, any, 
   };
 
 /**
+ * Extract body type from a response (content-type map)
+ */
+type ExtractResponseBody<T> = T extends ResponseByContentType
+  ? // For content-type maps, extract union of all body types
+    {
+      [K in keyof T]: T[K] extends ResponseSchema<infer TBody>
+        ? StandardSchemaV1.InferOutput<TBody>
+        : never;
+    }[keyof T]
+  : never;
+
+/**
+ * Extract headers type from a response (content-type map)
+ */
+type ExtractResponseHeaders<T> = T extends ResponseByContentType
+  ? // For content-type maps, extract union of all header types
+    {
+      [K in keyof T]: T[K] extends ResponseSchema<any, infer THeaders>
+        ? THeaders extends StandardSchemaV1
+          ? StandardSchemaV1.InferOutput<THeaders>
+          : never
+        : never;
+    }[keyof T]
+  : never;
+
+/**
  * Response type from a handler - must match one of the contract's response schemas
  */
 export type ContractOperationResponse<O extends ContractOperation> = {
   [K in keyof O['responses']]: {
     status: K;
-    body: O['responses'][K] extends ResponseSchema<infer TBody>
-      ? StandardSchemaV1.InferOutput<TBody>
-      : never;
-    headers?: O['responses'][K] extends ResponseSchema<any, infer THeaders>
-      ? THeaders extends StandardSchemaV1
-        ? StandardSchemaV1.InferOutput<THeaders>
-        : never
-      : never;
+    body: ExtractResponseBody<O['responses'][K]>;
+    headers?: ExtractResponseHeaders<O['responses'][K]>;
   };
 }[keyof O['responses']];
 
@@ -252,28 +283,36 @@ export type ContractOperationStatusCodes<O extends ContractOperation> = keyof O[
   number;
 
 /**
- * Extract body type for a specific status code
+ * Extract body type for a specific status code and content type
  */
 export type ContractOperationResponseBody<
   O extends ContractOperation,
   S extends ContractOperationStatusCodes<O>,
-> =
-  O['responses'][S] extends ResponseSchema<infer TBody>
-    ? StandardSchemaV1.InferOutput<TBody>
-    : never;
+  C extends string = 'application/json',
+> = O['responses'][S] extends ResponseByContentType
+  ? C extends keyof O['responses'][S]
+    ? O['responses'][S][C] extends ResponseSchema<infer TBody>
+      ? StandardSchemaV1.InferOutput<TBody>
+      : never
+    : never
+  : never;
 
 /**
- * Extract headers type for a specific status code
+ * Extract headers type for a specific status code and content type
  */
 export type ContractOperationResponseHeaders<
   O extends ContractOperation,
   S extends ContractOperationStatusCodes<O>,
-> =
-  O['responses'][S] extends ResponseSchema<any, infer THeaders>
-    ? THeaders extends StandardSchemaV1
-      ? StandardSchemaV1.InferOutput<THeaders>
+  C extends string = 'application/json',
+> = O['responses'][S] extends ResponseByContentType
+  ? C extends keyof O['responses'][S]
+    ? O['responses'][S][C] extends ResponseSchema<any, infer THeaders>
+      ? THeaders extends StandardSchemaV1
+        ? StandardSchemaV1.InferOutput<THeaders>
+        : never
       : never
-    : never;
+    : never
+  : never;
 
 /**
  * Extract a specific response variant from the union by status code
@@ -285,52 +324,38 @@ export type ResponseVariant<
 > = Extract<ContractOperationResponse<O>, { status: S }>;
 
 /**
- * Typed response helper methods attached to the request object
+ * Extract all valid content types for a given status code
+ */
+type ExtractContentTypes<
+  O extends ContractOperation,
+  S extends ContractOperationStatusCodes<O>,
+> = O['responses'][S] extends ResponseByContentType ? keyof O['responses'][S] & string : never;
+
+/**
+ * Response options for the respond() method
+ */
+export type RespondOptions<
+  O extends ContractOperation,
+  S extends ContractOperationStatusCodes<O>,
+  C extends ExtractContentTypes<O, S> & string,
+> = {
+  status: S;
+  contentType: C;
+  body: ContractOperationResponseBody<O, S, C>;
+  headers?: ContractOperationResponseHeaders<O, S, C>;
+};
+
+/**
+ * Typed response helper method attached to the request object
  */
 export type ContractOperationResponseHelpers<O extends ContractOperation> = {
   /**
-   * Create a JSON response with typed body and status code
-   * Validates that the status code exists in the contract and body matches the schema
-   * When status is omitted, defaults to 200 (if 200 is a valid status code)
+   * Create a response with typed body, status code, and content type
+   * Validates that the status code and content type exist in the contract
+   * and body/headers match the schemas
    */
-  // Overload: when status is omitted, default to 200 (only available if 200 is valid)
-  json(
-    body: 200 extends ContractOperationStatusCodes<O>
-      ? ContractOperationResponseBody<O, 200>
-      : never,
-    status?: 200,
-    headers?: 200 extends ContractOperationStatusCodes<O>
-      ? ContractOperationResponseHeaders<O, 200>
-      : never
-  ): ResponseVariant<O, 200>;
-  // Overload: when status is provided explicitly
-  json<S extends ContractOperationStatusCodes<O>>(
-    body: ContractOperationResponseBody<O, S>,
-    status: S,
-    headers?: ContractOperationResponseHeaders<O, S>
-  ): ResponseVariant<O, S>;
-
-  html(html: string, status?: number, headers?: unknown): ResponseVariant<O, 200>;
-  html<S extends ContractOperationStatusCodes<O>>(
-    html: string,
-    status: S,
-    headers?: ContractOperationResponseHeaders<O, S>
-  ): ResponseVariant<O, S>;
-
-  /**
-   * Create a no-content response (204)
-   * Validates that 204 is a valid status code in the contract
-   */
-  noContent<S extends ContractOperationStatusCodes<O> & 204>(status: S): ResponseVariant<O, S>;
-
-  /**
-   * Create an error response with typed body and status code
-   * Validates that the status code exists in the contract and body matches the schema
-   */
-  error<S extends ContractOperationStatusCodes<O>>(
-    status: S,
-    body: ContractOperationResponseBody<O, S>,
-    headers?: ContractOperationResponseHeaders<O, S>
+  respond<S extends ContractOperationStatusCodes<O>, C extends ExtractContentTypes<O, S>>(
+    options: RespondOptions<O, S, C>
   ): ResponseVariant<O, S>;
 };
 
@@ -376,12 +401,15 @@ export type ContractRouterOptions<
   };
   /** Response formatter (defaults to contract-aware JSON formatter) */
   format?: ResponseHandler;
-  /** Handler for missing routes (defaults to 404 error). Receives request with basic response helpers (json, error, noContent). */
+  /** Handler for missing routes (defaults to 404 error). Receives request with basic response helper (respond). */
   missing?: (
     request: RequestType & {
-      json: (body: any, status: number, headers?: HeadersInit) => any;
-      error: (status: number, body: any, headers?: HeadersInit) => any;
-      noContent: (status: number) => any;
+      respond: (options: {
+        status: number;
+        contentType: string;
+        body?: unknown;
+        headers?: HeadersInit;
+      }) => Response;
     },
     ...args: Args
   ) => Response | Promise<Response>;

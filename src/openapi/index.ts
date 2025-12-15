@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec';
-import { ContractDefinition, ContractOperation, HttpMethod, ResponseSchema } from '../types';
+import { ContractDefinition, ContractOperation, HttpMethod, ResponseByContentType } from '../types';
 import { OpenAPIV3_1 } from './types';
 import { extractSchema } from './vendors';
 
@@ -187,21 +187,26 @@ function collectSchemasFromOperation(
   // Response schemas
   if (operation.responses) {
     for (const [statusCode, response] of Object.entries(operation.responses)) {
-      if (response && typeof response === 'object' && 'body' in response) {
-        const responseSchema = response as ResponseSchema;
-        if (responseSchema.body) {
-          getOrCreateSchemaReference(
-            responseSchema.body,
-            registry,
-            `${operationId}Response${statusCode}Body`
-          );
-        }
-        if (responseSchema.headers) {
-          getOrCreateSchemaReference(
-            responseSchema.headers,
-            registry,
-            `${operationId}Response${statusCode}Headers`
-          );
+      if (!response || typeof response !== 'object') continue;
+
+      // Response must be a content-type map
+      const responseByContentType = response as ResponseByContentType;
+      for (const [contentType, responseSchema] of Object.entries(responseByContentType)) {
+        if (responseSchema && typeof responseSchema === 'object' && 'body' in responseSchema) {
+          if (responseSchema.body) {
+            getOrCreateSchemaReference(
+              responseSchema.body,
+              registry,
+              `${operationId}Response${statusCode}${contentType.replace(/[^a-zA-Z0-9]/g, '')}Body`
+            );
+          }
+          if (responseSchema.headers) {
+            getOrCreateSchemaReference(
+              responseSchema.headers,
+              registry,
+              `${operationId}Response${statusCode}${contentType.replace(/[^a-zA-Z0-9]/g, '')}Headers`
+            );
+          }
         }
       }
     }
@@ -384,43 +389,56 @@ function createOpenApiOperation(
   if (operation.responses) {
     const responses: OpenAPIV3_1.ResponsesObject = {};
     for (const [statusCode, response] of Object.entries(operation.responses)) {
-      if (response && typeof response === 'object' && 'body' in response) {
-        const responseSchema = response as ResponseSchema;
-        const responseObj: OpenAPIV3_1.ResponseObject = {
-          description: '', // Default description, could be enhanced
-        };
+      if (!response || typeof response !== 'object') continue;
 
-        // Response body
+      const responseObj: OpenAPIV3_1.ResponseObject = {
+        description: '', // Default description, could be enhanced
+      };
+
+      // Response must be a content-type map
+      const responseByContentType = response as ResponseByContentType;
+
+      // Build content object with all media types
+      const content: Record<string, OpenAPIV3_1.MediaTypeObject> = {};
+      const allHeaders: Record<string, OpenAPIV3_1.HeaderObject> = {};
+
+      for (const [contentType, responseSchema] of Object.entries(responseByContentType)) {
+        if (!responseSchema || typeof responseSchema !== 'object' || !('body' in responseSchema)) {
+          continue;
+        }
+
+        const mediaTypeObj: OpenAPIV3_1.MediaTypeObject = {};
+
+        // Response body schema
         if (responseSchema.body) {
+          const contentTypeSafe = contentType.replace(/[^a-zA-Z0-9]/g, '');
           const bodySchemaId = getOrCreateSchemaReference(
             responseSchema.body,
             registry,
-            `${operationId}Response${statusCode}Body`
+            `${operationId}Response${statusCode}${contentTypeSafe}Body`
           );
           if (bodySchemaId) {
-            responseObj.content = {
-              'application/json': {
-                schema: {
-                  $ref: `#/components/schemas/${bodySchemaId}`,
-                },
-              },
+            mediaTypeObj.schema = {
+              $ref: `#/components/schemas/${bodySchemaId}`,
             };
           }
         }
 
-        // Response headers
+        // Response headers schema (per content type)
         if (responseSchema.headers) {
+          const contentTypeSafe = contentType.replace(/[^a-zA-Z0-9]/g, '');
           const headersSchemaId = getOrCreateSchemaReference(
             responseSchema.headers,
             registry,
-            `${operationId}Response${statusCode}Headers`
+            `${operationId}Response${statusCode}${contentTypeSafe}Headers`
           );
           if (headersSchemaId && registry.schemas[headersSchemaId]) {
             const headersSchema = registry.schemas[headersSchemaId];
             if (headersSchema.properties) {
-              responseObj.headers = {};
+              // Headers are shared across all content types in OpenAPI, so we merge them
+              // If there are conflicts, the last one wins
               for (const [headerName, headerSchema] of Object.entries(headersSchema.properties)) {
-                responseObj.headers[headerName] = {
+                allHeaders[headerName] = {
                   schema: headerSchema as OpenAPIV3_1.SchemaObject,
                   description: (headerSchema as OpenAPIV3_1.SchemaObject).description,
                 };
@@ -429,8 +447,18 @@ function createOpenApiOperation(
           }
         }
 
-        responses[statusCode] = responseObj;
+        content[contentType] = mediaTypeObj;
       }
+
+      if (Object.keys(content).length > 0) {
+        responseObj.content = content;
+      }
+
+      if (Object.keys(allHeaders).length > 0) {
+        responseObj.headers = allHeaders;
+      }
+
+      responses[statusCode] = responseObj;
     }
     operationObj.responses = responses;
   }

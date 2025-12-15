@@ -252,18 +252,22 @@ describe('OpenAPI Specification Generation', () => {
         path: '/users/:id',
         responses: {
           200: {
-            body: z.object({
-              id: z.string(),
-              name: z.string(),
-              email: z.string().email(),
-            }),
-            headers: z.object({
-              'X-Request-ID': z.string().uuid(),
-              'X-RateLimit-Remaining': z.number().int(),
-            }),
+            'application/json': {
+              body: z.object({
+                id: z.string(),
+                name: z.string(),
+                email: z.string().email(),
+              }),
+              headers: z.object({
+                'X-Request-ID': z.string().uuid(),
+                'X-RateLimit-Remaining': z.number().int(),
+              }),
+            },
           },
           404: {
-            body: z.object({ error: z.string() }),
+            'application/json': {
+              body: z.object({ error: z.string() }),
+            },
           },
         },
       },
@@ -478,5 +482,137 @@ describe('OpenAPI Specification Generation', () => {
     expect(operation?.requestBody).toBeDefined();
     // Schema should be registered
     expect(spec.components?.schemas).toBeDefined();
+  });
+
+  test('should support content-type-specific responses (new format)', () => {
+    const contract = createContract({
+      getData: {
+        path: '/data',
+        responses: {
+          200: {
+            'application/json': {
+              body: z.object({ result: z.number() }),
+            },
+            'text/html': {
+              body: z.string(),
+            },
+            'application/xml': {
+              body: z.string(),
+            },
+          },
+        },
+      },
+    });
+
+    const spec = createOpenApiSpecification(contract, {
+      title: 'Test API',
+      version: '1.0.0',
+    });
+
+    const operation = spec.paths?.['/data']?.get;
+    const response200 = operation?.responses?.['200'];
+    expect(response200).toBeDefined();
+    expect(response200?.content).toBeDefined();
+    expect(response200?.content?.['application/json']).toBeDefined();
+    expect(response200?.content?.['text/html']).toBeDefined();
+    expect(response200?.content?.['application/xml']).toBeDefined();
+    expect(response200?.content?.['application/json']?.schema?.$ref).toContain(
+      '#/components/schemas/'
+    );
+  });
+
+  test('should support different headers per content type', () => {
+    const contract = createContract({
+      getData: {
+        path: '/data',
+        responses: {
+          200: {
+            'application/json': {
+              body: z.object({ result: z.number() }),
+              headers: z.object({
+                'Content-Length': z.string(),
+                'X-Request-ID': z.string(),
+              }),
+            },
+            'text/html': {
+              body: z.string(),
+              headers: z.object({
+                'Content-Length': z.string(),
+              }),
+            },
+          },
+        },
+      },
+    });
+
+    const spec = createOpenApiSpecification(contract, {
+      title: 'Test API',
+      version: '1.0.0',
+    });
+
+    const operation = spec.paths?.['/data']?.get;
+    const response200 = operation?.responses?.['200'];
+    expect(response200?.headers).toBeDefined();
+    // Headers are merged, so both should be present
+    expect(response200?.headers?.['Content-Length']).toBeDefined();
+    expect(response200?.headers?.['X-Request-ID']).toBeDefined();
+  });
+
+  test('should register schemas for all content types', () => {
+    const jsonSchema = z.object({ result: z.number() });
+    const htmlSchema = z.string();
+    const xmlSchema = z.string();
+
+    const contract = createContract({
+      getData: {
+        path: '/data',
+        responses: {
+          200: {
+            'application/json': { body: jsonSchema },
+            'text/html': { body: htmlSchema },
+            'application/xml': { body: xmlSchema },
+          },
+        },
+      },
+    });
+
+    const spec = createOpenApiSpecification(contract, {
+      title: 'Test API',
+      version: '1.0.0',
+    });
+
+    // All schemas should be registered
+    expect(spec.components?.schemas).toBeDefined();
+    const schemaKeys = Object.keys(spec.components?.schemas || {});
+    // Should have at least 3 schemas (one for each content type)
+    expect(schemaKeys.length).toBeGreaterThanOrEqual(3);
+  });
+
+  test('should handle error responses with content-type maps', () => {
+    const contract = createContract({
+      getData: {
+        path: '/data',
+        responses: {
+          200: {
+            'application/json': { body: z.object({ result: z.number() }) },
+          },
+          400: {
+            'application/json': { body: z.object({ error: z.string() }) },
+          },
+          500: {
+            'application/json': { body: z.object({ error: z.string(), code: z.string() }) },
+          },
+        },
+      },
+    });
+
+    const spec = createOpenApiSpecification(contract, {
+      title: 'Test API',
+      version: '1.0.0',
+    });
+
+    const operation = spec.paths?.['/data']?.get;
+    expect(operation?.responses?.['400']?.content?.['application/json']).toBeDefined();
+    expect(operation?.responses?.['500']?.content?.['application/json']).toBeDefined();
   });
 });

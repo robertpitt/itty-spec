@@ -6,11 +6,13 @@ import { z } from 'zod/v4';
  */
 const CalculateRequest = z
   .object({
+    /* This is the left operand for the calculation */
     a: z
       .string()
       .transform((val) => parseInt(val, 10))
       .pipe(z.number().min(0).max(100))
       .meta({ title: 'Left Operand', description: 'The left operand for the calculation' }),
+    /* This is the right operand for the calculation */
     b: z
       .string()
       .transform((val) => parseInt(val, 10))
@@ -62,6 +64,38 @@ const CalculateError = z
   .meta({ title: 'Calculate Error', description: 'The error from the calculation' });
 
 /**
+ * CalculateResponseHTML schema
+ */
+const CalculateResponseHTML = z.string().meta({
+  title: 'Calculate Response HTML',
+  description: 'The HTML representation of the calculation result',
+});
+
+/**
+ * CalculateResponseXML schema
+ */
+const CalculateResponseXML = z.string().meta({
+  title: 'Calculate Response XML',
+  description: 'The XML representation of the calculation result',
+});
+
+/**
+ * CalculateErrorHTML schema
+ */
+const CalculateErrorHTML = z.string().meta({
+  title: 'Calculate Error HTML',
+  description: 'The HTML representation of the calculation error',
+});
+
+/**
+ * CalculateErrorXML schema
+ */
+const CalculateErrorXML = z.string().meta({
+  title: 'Calculate Error XML',
+  description: 'The XML representation of the calculation error',
+});
+
+/**
  * Example Hello World contract
  */
 export const contract = createContract({
@@ -71,8 +105,16 @@ export const contract = createContract({
     description: 'Calculate the sum of two numbers',
     query: CalculateRequest,
     responses: {
-      200: { body: CalculateResponse },
-      400: { body: CalculateError },
+      200: {
+        'application/json': { body: CalculateResponse },
+        'text/html': { body: CalculateResponseHTML },
+        'application/xml': { body: CalculateResponseXML },
+      },
+      400: {
+        'application/json': { body: CalculateError },
+        'text/html': { body: CalculateErrorHTML },
+        'application/xml': { body: CalculateErrorXML },
+      },
     },
     tags: ['Calculate API'],
   },
@@ -82,14 +124,40 @@ export const contract = createContract({
     summary: 'Calculate',
     description: 'Calculate the sum of two numbers',
     headers: z.object({
-      'Content-Type': z.literal('application/json'),
+      'Content-Type': z.union([
+        z.literal('application/json'),
+        z.literal('text/html'),
+        z.literal('application/xml'),
+      ]),
     }),
     request: CalculatePostRequest,
     responses: {
-      200: { body: CalculateResponse },
-      400: { body: CalculateError },
+      200: {
+        'application/json': { body: CalculateResponse },
+        'text/html': { body: CalculateResponseHTML },
+        'application/xml': { body: CalculateResponseXML },
+      },
+      400: {
+        'application/json': { body: CalculateError },
+        'text/html': { body: CalculateErrorHTML },
+        'application/xml': { body: CalculateErrorXML },
+      },
     },
     tags: ['Calculate API'],
+  },
+  azizGetMethod: {
+    path: '/aziz',
+    method: 'GET',
+    query: z.object({
+      name: z.string(),
+      age: z.number().min(0).max(100),
+      isStudent: z.boolean(),
+      hobbies: z.array(z.string()),
+    }),
+    responses: {
+      200: { 'application/json': { body: z.object({ message: z.string() }) } },
+    },
+    tags: ['Aziz'],
   },
   getDocs: {
     path: '/docs',
@@ -100,9 +168,16 @@ export const contract = createContract({
     tags: ['Misc'],
     responses: {
       200: {
-        body: z
-          .string()
-          .meta({ description: 'The HTML representation of the OpenAPI specification' }),
+        'text/html': {
+          body: z
+            .string()
+            .meta({ description: 'The HTML representation of the OpenAPI specification' }),
+          'application/json': {
+            body: z.object({
+              openapi: z.string(),
+            }),
+          },
+        },
       },
     },
   },

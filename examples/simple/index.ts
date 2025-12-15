@@ -3,6 +3,14 @@ import { createServer } from 'http';
 import { contract } from './contract';
 import { createOpenApiSpecification } from '../../src/openapi';
 import { createRouter } from '../../src/index.ts';
+import {
+  createSpotlightElementsHtml,
+  formatCalculateResponseXML,
+  formatCalculateErrorXML,
+  formatCalculateResponseHTML,
+  formatCalculateErrorHTML,
+  getPreferredContentType,
+} from './utils.ts';
 
 /**
  * Convert the contract to an OpenAPI specification so we can serve it from the router
@@ -12,65 +20,127 @@ const openApiSpecification = createOpenApiSpecification(contract, {
   version: '1.0.0',
   // markdown description showing of the markdown syntax
   description: `
-  # Simple API
-  This is a simple API that demonstrates the use of the contract-router library.
-  It is a basic API that allows you to calculate the sum of two numbers.
-  It also provides a documentation endpoint that allows you to view the API documentation.
+    # Simple API
+    This is a simple API that demonstrates the use of the contract-router library.
+    It is a basic API that allows you to calculate the sum of two numbers.
+    It also provides a documentation endpoint that allows you to view the API documentation.
 
-  ## Calculating the sum of two numbers
-  To calculate the sum of two numbers, you can use the following endpoint:
-  \`\`\`
-  GET /calculate
-  \`\`\`
-  The request body should be a JSON object with the following properties:
-  \`\`\`
-  { "a": 1, "b": 2 }
-  \`\`\`
-  The response will be a JSON object with the following properties:
-  `,
+    ## Calculating the sum of two numbers
+    To calculate the sum of two numbers, you can use the following endpoint:
+    \`\`\`
+    GET /calculate
+    \`\`\`
+    The request body should be a JSON object with the following properties:
+    \`\`\`
+    { "a": 1, "b": 2 }
+    \`\`\`
+    The response will be a JSON object with the following properties:
+    `,
 });
-
-/**
- * We use an embedded elements
- */
-const openApiSpecificationHtml = `
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>API Documentation</title>
-    <script src="https://unpkg.com/@stoplight/elements/web-components.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/@stoplight/elements/styles.min.css">
-  </head>
-  <body>
-    <elements-api id="docs" router="hash" layout="sidebar"></elements-api>
-    <script>
-    (async () => {
-      const docs = document.getElementById('docs');
-      docs.apiDescriptionDocument = ${JSON.stringify(openApiSpecification)};;
-    })();
-    </script>
-  </body>
-</html>`;
 
 const router = createRouter({
   contract,
   handlers: {
     getCalculate: async (request) => {
       const result = request.validatedQuery.a + request.validatedQuery.b;
-      return result > 100
-        ? request.json({ error: 'Invalid request' }, 400)
-        : request.json({ result: result }, 200);
+      const contentType = getPreferredContentType(request.headers.get('Accept'));
+
+      if (result > 100) {
+        const errorMessage = 'Invalid request';
+        if (contentType === 'text/html') {
+          return request.respond({
+            status: 400,
+            contentType: 'text/html',
+            body: formatCalculateErrorHTML(errorMessage),
+          });
+        }
+        if (contentType === 'application/xml') {
+          return request.respond({
+            status: 400,
+            contentType: 'application/xml',
+            body: formatCalculateErrorXML(errorMessage),
+          });
+        }
+        return request.respond({
+          status: 400,
+          contentType: 'application/json',
+          body: { error: errorMessage },
+        });
+      }
+
+      if (contentType === 'text/html') {
+        return request.respond({
+          status: 200,
+          contentType: 'text/html',
+          body: formatCalculateResponseHTML(result),
+        });
+      }
+      if (contentType === 'application/xml') {
+        return request.respond({
+          status: 200,
+          contentType: 'application/xml',
+          body: formatCalculateResponseXML(result),
+        });
+      }
+      return request.respond({
+        status: 200,
+        contentType: 'application/json',
+        body: { result: result },
+      });
     },
     postCalculate: async (request) => {
       const result = request.validatedBody.a + request.validatedBody.b;
-      return result > 100
-        ? request.json({ error: 'Invalid request' }, 400)
-        : request.json({ result: result }, 200);
+      const contentType = getPreferredContentType(request.headers.get('Accept'));
+
+      if (result > 100) {
+        const errorMessage = 'Invalid request';
+        if (contentType === 'text/html') {
+          return request.respond({
+            status: 400,
+            contentType: 'text/html',
+            body: formatCalculateErrorHTML(errorMessage),
+          });
+        }
+        if (contentType === 'application/xml') {
+          return request.respond({
+            status: 400,
+            contentType: 'application/xml',
+            body: formatCalculateErrorXML(errorMessage),
+          });
+        }
+        return request.respond({
+          status: 400,
+          contentType: 'application/json',
+          body: { error: errorMessage },
+        });
+      }
+
+      if (contentType === 'text/html') {
+        return request.respond({
+          status: 200,
+          contentType: 'text/html',
+          body: formatCalculateResponseHTML(result),
+        });
+      }
+      if (contentType === 'application/xml') {
+        return request.respond({
+          status: 200,
+          contentType: 'application/xml',
+          body: formatCalculateResponseXML(result),
+        });
+      }
+      return request.respond({
+        status: 200,
+        contentType: 'application/json',
+        body: { result: result },
+      });
     },
     getDocs: async (request) => {
-      return request.html(openApiSpecificationHtml);
+      return request.respond({
+        status: 200,
+        contentType: 'text/html',
+        body: createSpotlightElementsHtml(openApiSpecification),
+      });
     },
   },
 });

@@ -54,6 +54,67 @@ export function withContractOperation<TOperation extends ContractOperation>(
 }
 
 /**
+ * Check if a path pattern matches a URL pathname
+ * Supports patterns like "/users/:id" matching "/users/123"
+ */
+function matchesPathPattern(pattern: string, pathname: string): boolean {
+  const patternSegments = pattern.split('/').filter(Boolean);
+  const pathSegments = pathname.split('/').filter(Boolean);
+
+  if (patternSegments.length !== pathSegments.length) {
+    return false;
+  }
+
+  for (let i = 0; i < patternSegments.length; i++) {
+    const patternSegment = patternSegments[i];
+    const pathSegment = pathSegments[i];
+
+    // If pattern segment is a param (starts with :), it matches any value
+    if (patternSegment.startsWith(':')) {
+      continue;
+    }
+
+    // Otherwise, segments must match exactly
+    if (patternSegment !== pathSegment) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Global middleware factory: Finds and sets the matching contract operation
+ * This should be added to the router's `before` array to run for all routes
+ *
+ * @param contract - The contract definition containing all operations
+ * @returns A middleware function that finds and sets the matching operation
+ */
+export function withMatchingContractOperation<TContract extends Record<string, ContractOperation>>(
+  contract: TContract,
+  base?: string
+): RequestHandler<IRequest> {
+  return (request: IRequest) => {
+    // If operation already set (e.g., by route-specific middleware), skip
+    if ((request as ContractAugmentedRequest).__contractOperation) {
+      return;
+    }
+
+    const method = request.method.toUpperCase();
+    const pathname = new URL(request.url).pathname.slice(base?.length || 0);
+
+    // Find matching operation by method and path pattern
+    for (const operation of Object.values(contract)) {
+      const operationMethod = (operation.method || 'GET').toUpperCase();
+      if (operationMethod === method && matchesPathPattern(operation.path, pathname)) {
+        (request as ContractAugmentedRequest).__contractOperation = operation;
+        return;
+      }
+    }
+  };
+}
+
+/**
  * Middleware factory: Parses and validates path parameters according to the contract
  * Extends the request with typed params property
  *
@@ -214,12 +275,100 @@ export function withResponseHelpers<TOperation extends ContractOperation>(
 ): RequestHandler<IRequest> {
   return (request: IRequest) => {
     const helpers = createResponseHelpers(operation);
-    defineProp(request, 'json', helpers.json);
-    defineProp(request, 'html', helpers.html);
-    defineProp(request, 'error', helpers.error);
-    defineProp(request, 'noContent', helpers.noContent);
+    defineProp(request, 'respond', helpers.respond);
   };
 }
+
+/**
+ * Global middleware: Validates path parameters using the operation from request
+ * This reads from __contractOperation set by withMatchingContractOperation
+ */
+export const withGlobalPathParams: RequestHandler<IRequest> = async (request: IRequest) => {
+  const operation = (request as ContractAugmentedRequest).__contractOperation;
+  if (!operation) return;
+
+  let requestParams = (request.params as Record<string, string> | undefined) || {};
+  if (!Object.keys(requestParams).length && request.url) {
+    requestParams = extractPathParamsFromUrl(operation.path, request.url);
+  }
+  const params = operation.pathParams
+    ? await validateSchema<Record<string, string>>(operation.pathParams, requestParams)
+    : requestParams;
+  defineProp(request, 'params', params);
+};
+
+/**
+ * Global middleware: Validates query parameters using the operation from request
+ * This reads from __contractOperation set by withMatchingContractOperation
+ */
+export const withGlobalQueryParams: RequestHandler<IRequest> = async (request: IRequest) => {
+  const operation = (request as ContractAugmentedRequest).__contractOperation;
+  if (!operation) return;
+
+  let requestQuery = (request.query as Record<string, unknown> | undefined) || {};
+  if (!Object.keys(requestQuery).length && request.url) {
+    requestQuery = extractQueryParamsFromUrl(request.url);
+  }
+  const query = operation.query
+    ? await validateSchema<Record<string, unknown>>(operation.query, requestQuery)
+    : requestQuery;
+  defineProp(request, 'validatedQuery', query);
+  defineProp(request, 'query', query);
+};
+
+/**
+ * Global middleware: Validates headers using the operation from request
+ * This reads from __contractOperation set by withMatchingContractOperation
+ */
+export const withGlobalHeaders: RequestHandler<IRequest> = async (request: IRequest) => {
+  const operation = (request as ContractAugmentedRequest).__contractOperation;
+  if (!operation) return;
+
+  const requestHeaders = normalizeHeaders(request.headers, !operation.headers);
+  const headers = operation.headers
+    ? await validateSchema<Record<string, unknown>>(operation.headers, requestHeaders)
+    : requestHeaders;
+  defineProp(request, 'validatedHeaders', headers);
+};
+
+/**
+ * Global middleware: Validates body using the operation from request
+ * This reads from __contractOperation set by withMatchingContractOperation
+ */
+export const withGlobalBody: RequestHandler<IRequest> = async (request: IRequest) => {
+  const operation = (request as ContractAugmentedRequest).__contractOperation;
+  if (!operation || !operation.request) return;
+
+  let bodyData: unknown = {};
+  let bodyReadSuccessfully = false;
+  try {
+    const bodyText = await request.text();
+    bodyReadSuccessfully = true;
+    if (bodyText?.trim()) {
+      try {
+        bodyData = JSON.parse(bodyText);
+      } catch {
+        bodyData = bodyText;
+      }
+    }
+  } catch {
+    bodyData = {};
+  }
+  const body = bodyReadSuccessfully ? await validateSchema(operation.request, bodyData) : bodyData;
+  defineProp(request, 'validatedBody', body);
+};
+
+/**
+ * Global middleware: Attaches response helpers using the operation from request
+ * This reads from __contractOperation set by withMatchingContractOperation
+ */
+export const withGlobalResponseHelpers: RequestHandler<IRequest> = (request: IRequest) => {
+  const operation = (request as ContractAugmentedRequest).__contractOperation;
+  if (!operation) return;
+
+  const helpers = createResponseHelpers(operation);
+  defineProp(request, 'respond', helpers.respond);
+};
 
 /**
  * Contract-aware response formatter middleware

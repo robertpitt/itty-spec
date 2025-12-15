@@ -336,9 +336,7 @@ describe('withResponseHelpers', () => {
 
     middleware(request);
 
-    expect((request as any).json).toBeDefined();
-    expect((request as any).error).toBeDefined();
-    expect((request as any).noContent).toBeDefined();
+    expect((request as any).respond).toBeDefined();
   });
 });
 

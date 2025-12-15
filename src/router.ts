@@ -4,7 +4,6 @@ import {
   type IRequest,
   withParams,
   error,
-  type RequestHandler,
   type ResponseHandler,
 } from 'itty-router';
 import type {
@@ -15,12 +14,12 @@ import type {
 } from './types';
 import { createBasicResponseHelpers } from './utils';
 import {
-  withContractOperation,
-  withPathParams,
-  withQueryParams,
-  withHeaders,
-  withBody,
-  withResponseHelpers,
+  withMatchingContractOperation,
+  withGlobalPathParams,
+  withGlobalQueryParams,
+  withGlobalHeaders,
+  withGlobalBody,
+  withGlobalResponseHelpers,
   withContractFormat,
   withContractErrorHandler,
 } from './middleware.js';
@@ -68,41 +67,65 @@ export const createRouter = <
 >(
   options: ContractRouterOptions<TContract, RequestType, Args>
 ) => {
-  const wrappedMissingHandler: RequestHandler<RequestType, Args> = (
-    request: RequestType,
-    ...args: Args
+  // Create missing handler middleware
+  // In itty-router, middleware that returns something stops execution
+  // If no route matches, this will be called to handle 404s
+  const missingHandler: ResponseHandler = (
+    response: unknown,
+    request: unknown,
+    ...args: unknown[]
   ) => {
+    // If a response was already returned, pass it through
+    if (response != null) {
+      return response as Response;
+    }
+
+    // No response means no route matched - handle missing route
+    const requestWithHelpers = {
+      ...(request as RequestType),
+      ...createBasicResponseHelpers(),
+    } as RequestType & ReturnType<typeof createBasicResponseHelpers>;
+
     if (options.missing) {
-      return options.missing(
-        { ...request, ...createBasicResponseHelpers() } as RequestType &
-          ReturnType<typeof createBasicResponseHelpers>,
-        ...args
-      );
+      return options.missing(requestWithHelpers, ...(args as Args));
     }
     return error(404);
   };
 
-  const beforeMiddleware: RequestHandler<RequestType, Args>[] = [
-    withParams as unknown as RequestHandler<RequestType, Args>,
-    ...(options.before || []),
-  ];
-  const errorHandler = withContractErrorHandler<RequestType, Args>();
-  const finallyHandlers: ResponseHandler[] = [
-    ((response: any, request: any, ...args: any[]) =>
-      response == null
-        ? wrappedMissingHandler(request as RequestType, ...(args as Args))
-        : (response as Response)) as unknown as ResponseHandler,
-    withContractFormat(options.format),
-    ...(options.finally || []),
-  ];
-
+  // Build middleware chain following itty-router patterns:
+  // - before: runs before route handlers, doesn't return to continue
+  // - catch: handles errors thrown during execution
+  // - finally: runs after §handlers, can transform responses
   const router = Router<RequestType, Args, Response>({
     base: options.base,
-    before: beforeMiddleware,
-    catch: errorHandler,
-    finally: finallyHandlers,
+    before: [
+      withParams as unknown as (request: RequestType, ...args: Args) => void,
+      // Attach the contract to the request object
+      withMatchingContractOperation(options.contract, options.base),
+      // Use the contract operation to validate the request path
+      withGlobalPathParams,
+      // Use the contract operation to validate the request query params
+      withGlobalQueryParams,
+      // Use the contract operation to validate the request headers
+      withGlobalHeaders,
+      // Use the contract operation to validate the request body
+      withGlobalBody,
+      // Use the contract operation to validate the response
+      withGlobalResponseHelpers,
+      // Pass user defined before middleware to the chain
+      ...(options.before || []),
+    ],
+    // Handle errors thrown during execution
+    catch: withContractErrorHandler<RequestType, Args>(),
+    finally: [
+      // handle not found routes
+      missingHandler,
+      withContractFormat(options.format),
+      ...(options.finally || []),
+    ],
   });
 
+  // Register routes - middleware is now global, so we only need to register handlers
   for (const [contractKey, operation] of Object.entries(options.contract)) {
     const handler = options.handlers[contractKey as keyof TContract];
     if (!handler) continue;
@@ -112,16 +135,8 @@ export const createRouter = <
       method: operation.method ?? 'GET',
     };
     const method = operationWithDefaults.method.toLowerCase() as Lowercase<HttpMethod>;
-    router[method]<IRequest, Args>(
-      operation.path,
-      withContractOperation(operationWithDefaults),
-      withPathParams(operationWithDefaults),
-      withQueryParams(operationWithDefaults),
-      withHeaders(operationWithDefaults),
-      withBody(operationWithDefaults),
-      withResponseHelpers(operationWithDefaults),
-      async (request: IRequest, ...args: Args) =>
-        handler(request as ContractRequest<TContract[keyof TContract]>, ...args)
+    router[method]<IRequest, Args>(operation.path, async (request: IRequest, ...args: Args) =>
+      handler(request as ContractRequest<TContract[keyof TContract]>, ...args)
     );
   }
 

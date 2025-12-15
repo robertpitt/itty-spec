@@ -14,8 +14,8 @@ test('GET request with query parameters should handle validated query parameters
         b: z.string().transform((val) => parseInt(val, 10)),
       }),
       responses: {
-        200: { body: z.object({ result: z.number() }) },
-        400: { body: z.object({ error: z.string() }) },
+        200: { 'application/json': { body: z.object({ result: z.number() }) } },
+        400: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -26,8 +26,12 @@ test('GET request with query parameters should handle validated query parameters
       getCalculate: async (request) => {
         const result = request.validatedQuery.a + request.validatedQuery.b;
         return result > 100
-          ? request.error(400, { error: 'Invalid request' })
-          : request.json({ result }, 200);
+          ? request.respond({
+              status: 400,
+              contentType: 'application/json',
+              body: { error: 'Invalid request' },
+            })
+          : request.respond({ status: 200, contentType: 'application/json', body: { result } });
       },
     },
   });
@@ -51,8 +55,8 @@ test('GET request with query parameters should return 400 for invalid query para
         b: z.string().transform((val) => parseInt(val, 10)),
       }),
       responses: {
-        200: { body: z.object({ result: z.number() }) },
-        400: { body: z.object({ error: z.string() }) },
+        200: { 'application/json': { body: z.object({ result: z.number() }) } },
+        400: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -63,8 +67,12 @@ test('GET request with query parameters should return 400 for invalid query para
       getCalculate: async (request) => {
         const result = request.validatedQuery.a + request.validatedQuery.b;
         return result > 100
-          ? request.error(400, { error: 'Invalid request' })
-          : request.json({ result }, 200);
+          ? request.respond({
+              status: 400,
+              contentType: 'application/json',
+              body: { error: 'Invalid request' },
+            })
+          : request.respond({ status: 200, contentType: 'application/json', body: { result } });
       },
     },
   });
@@ -88,8 +96,8 @@ test('POST request with body should handle validated body', async () => {
         b: z.number().min(0).max(100),
       }),
       responses: {
-        200: { body: z.object({ result: z.number() }) },
-        400: { body: z.object({ error: z.string() }) },
+        200: { 'application/json': { body: z.object({ result: z.number() }) } },
+        400: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -100,8 +108,12 @@ test('POST request with body should handle validated body', async () => {
       postCalculate: async (request) => {
         const result = request.validatedBody.a + request.validatedBody.b;
         return result > 100
-          ? request.error(400, { error: 'Invalid request' })
-          : request.json({ result }, 200);
+          ? request.respond({
+              status: 400,
+              contentType: 'application/json',
+              body: { error: 'Invalid request' },
+            })
+          : request.respond({ status: 200, contentType: 'application/json', body: { result } });
       },
     },
   });
@@ -129,8 +141,8 @@ test('POST request with body should return 400 for invalid body', async () => {
         b: z.number().min(0).max(100),
       }),
       responses: {
-        200: { body: z.object({ result: z.number() }) },
-        400: { body: z.object({ error: z.string() }) },
+        200: { 'application/json': { body: z.object({ result: z.number() }) } },
+        400: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -141,8 +153,12 @@ test('POST request with body should return 400 for invalid body', async () => {
       postCalculate: async (request) => {
         const result = request.validatedBody.a + request.validatedBody.b;
         return result > 100
-          ? request.error(400, { error: 'Invalid request' })
-          : request.json({ result }, 200);
+          ? request.respond({
+              status: 400,
+              contentType: 'application/json',
+              body: { error: 'Invalid request' },
+            })
+          : request.respond({ status: 200, contentType: 'application/json', body: { result } });
       },
     },
   });
@@ -166,8 +182,8 @@ test('GET request with path parameters should handle path parameters', async () 
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { body: z.object({ id: z.string(), name: z.string() }) },
-        404: { body: z.object({ error: z.string() }) },
+        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        404: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -178,9 +194,17 @@ test('GET request with path parameters should handle path parameters', async () 
       getUser: async (request) => {
         const userId = request.params.id;
         if (userId === '123') {
-          return request.json({ id: userId, name: 'John Doe' }, 200);
+          return request.respond({
+            status: 200,
+            contentType: 'application/json',
+            body: { id: userId, name: 'John Doe' },
+          });
         }
-        return request.error(404, { error: 'User not found' });
+        return request.respond({
+          status: 404,
+          contentType: 'application/json',
+          body: { error: 'User not found' },
+        });
       },
     },
   });
@@ -200,8 +224,8 @@ test('GET request with path parameters should handle 404 for non-existent user',
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { body: z.object({ id: z.string(), name: z.string() }) },
-        404: { body: z.object({ error: z.string() }) },
+        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        404: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -212,9 +236,17 @@ test('GET request with path parameters should handle 404 for non-existent user',
       getUser: async (request) => {
         const userId = request.params.id;
         if (userId === '123') {
-          return request.json({ id: userId, name: 'John Doe' }, 200);
+          return request.respond({
+            status: 200,
+            contentType: 'application/json',
+            body: { id: userId, name: 'John Doe' },
+          });
         }
-        return request.error(404, { error: 'User not found' });
+        return request.respond({
+          status: 404,
+          contentType: 'application/json',
+          body: { error: 'User not found' },
+        });
       },
     },
   });
@@ -234,8 +266,8 @@ test('DELETE request with 204 No Content should handle DELETE request returning 
       path: '/users/:id',
       method: 'DELETE',
       responses: {
-        204: { body: z.never() },
-        404: { body: z.object({ error: z.string() }) },
+        204: { 'application/json': { body: z.never() } },
+        404: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -246,9 +278,13 @@ test('DELETE request with 204 No Content should handle DELETE request returning 
       deleteUser: async (request) => {
         const userId = request.params.id;
         if (userId === '123') {
-          return request.noContent(204);
+          return request.respond({ status: 204, contentType: 'application/json', body: undefined });
         }
-        return request.error(404, { error: 'User not found' });
+        return request.respond({
+          status: 404,
+          contentType: 'application/json',
+          body: { error: 'User not found' },
+        });
       },
     },
   });
@@ -272,8 +308,8 @@ test('Request with headers validation should handle request with validated heade
         authorization: z.string(),
       }),
       responses: {
-        200: { body: z.object({ message: z.string() }) },
-        401: { body: z.object({ error: z.string() }) },
+        200: { 'application/json': { body: z.object({ message: z.string() }) } },
+        401: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -284,9 +320,17 @@ test('Request with headers validation should handle request with validated heade
       getProtected: async (request) => {
         const auth = request.validatedHeaders.authorization;
         if (auth === 'Bearer token123') {
-          return request.json({ message: 'Access granted' }, 200);
+          return request.respond({
+            status: 200,
+            contentType: 'application/json',
+            body: { message: 'Access granted' },
+          });
         }
-        return request.error(401, { error: 'Unauthorized' });
+        return request.respond({
+          status: 401,
+          contentType: 'application/json',
+          body: { error: 'Unauthorized' },
+        });
       },
     },
   });
@@ -312,8 +356,8 @@ test('Error handling should handle validation errors gracefully', async () => {
         email: z.email(),
       }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
-        400: { body: z.object({ error: z.string() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        400: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -322,7 +366,11 @@ test('Error handling should handle validation errors gracefully', async () => {
     contract,
     handlers: {
       postUser: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -353,8 +401,10 @@ test('Query parameter validation should return 400 with error details for missin
         page: z.string().transform((val) => parseInt(val, 10)),
       }),
       responses: {
-        200: { body: z.object({ results: z.array(z.string()) }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        200: { 'application/json': { body: z.object({ results: z.array(z.string()) }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -363,7 +413,11 @@ test('Query parameter validation should return 400 with error details for missin
     contract,
     handlers: {
       search: async (request) => {
-        return request.json({ results: [] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { results: [] },
+        });
       },
     },
   });
@@ -395,8 +449,10 @@ test('Query parameter validation should return 400 for invalid type', async () =
           .transform((val) => parseInt(val, 10)),
       }),
       responses: {
-        200: { body: z.object({ items: z.array(z.string()) }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        200: { 'application/json': { body: z.object({ items: z.array(z.string()) }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -405,7 +461,11 @@ test('Query parameter validation should return 400 for invalid type', async () =
     contract,
     handlers: {
       getItems: async (request) => {
-        return request.json({ items: [] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { items: [] },
+        });
       },
     },
   });
@@ -431,8 +491,10 @@ test('Body validation should return 400 with error details for missing required 
         age: z.number().min(18),
       }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -441,7 +503,11 @@ test('Body validation should return 400 with error details for missing required 
     contract,
     handlers: {
       createUser: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -471,8 +537,10 @@ test('Body validation should return 400 for invalid email format', async () => {
         email: z.string().email(),
       }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -481,7 +549,11 @@ test('Body validation should return 400 for invalid email format', async () => {
     contract,
     handlers: {
       createUser: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -510,8 +582,10 @@ test('Body validation should return 400 for value below minimum constraint', asy
         age: z.number().min(18).max(120),
       }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -520,7 +594,11 @@ test('Body validation should return 400 for value below minimum constraint', asy
     contract,
     handlers: {
       createUser: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -550,8 +628,10 @@ test('Body validation should return 400 for value above maximum constraint', asy
         quantity: z.number().int().min(0).max(1000),
       }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -560,7 +640,11 @@ test('Body validation should return 400 for value above maximum constraint', asy
     contract,
     handlers: {
       createProduct: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -597,8 +681,10 @@ test('Body validation should return 400 for invalid nested object structure', as
         ),
       }),
       responses: {
-        201: { body: z.object({ orderId: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        201: { 'application/json': { body: z.object({ orderId: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -607,7 +693,11 @@ test('Body validation should return 400 for invalid nested object structure', as
     contract,
     handlers: {
       createOrder: async (request) => {
-        return request.json({ orderId: 'order-123' }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { orderId: 'order-123' },
+        });
       },
     },
   });
@@ -646,8 +736,10 @@ test('Body validation should return 400 for invalid array item', async () => {
         ),
       }),
       responses: {
-        201: { body: z.object({ orderId: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        201: { 'application/json': { body: z.object({ orderId: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -656,7 +748,11 @@ test('Body validation should return 400 for invalid array item', async () => {
     contract,
     handlers: {
       createOrder: async (request) => {
-        return request.json({ orderId: 'order-123' }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { orderId: 'order-123' },
+        });
       },
     },
   });
@@ -690,8 +786,10 @@ test('Body validation should return 400 for invalid JSON body', async () => {
         email: z.string().email(),
       }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -700,7 +798,11 @@ test('Body validation should return 400 for invalid JSON body', async () => {
     contract,
     handlers: {
       createUser: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -727,8 +829,10 @@ test('Body validation should return 400 for empty body when body is required', a
         email: z.string().email(),
       }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -737,7 +841,11 @@ test('Body validation should return 400 for empty body when body is required', a
     contract,
     handlers: {
       createUser: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -766,8 +874,10 @@ test('Header validation should return 400 for missing required headers', async (
         'x-api-key': z.string().min(1),
       }),
       responses: {
-        200: { body: z.object({ message: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        200: { 'application/json': { body: z.object({ message: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -776,7 +886,11 @@ test('Header validation should return 400 for missing required headers', async (
     contract,
     handlers: {
       getProtected: async (request) => {
-        return request.json({ message: 'Access granted' }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { message: 'Access granted' },
+        });
       },
     },
   });
@@ -800,8 +914,10 @@ test('Header validation should return 400 for invalid header format', async () =
         authorization: z.string().regex(/^Bearer .+$/),
       }),
       responses: {
-        200: { body: z.object({ message: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        200: { 'application/json': { body: z.object({ message: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -810,7 +926,11 @@ test('Header validation should return 400 for invalid header format', async () =
     contract,
     handlers: {
       getProtected: async (request) => {
-        return request.json({ message: 'Access granted' }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { message: 'Access granted' },
+        });
       },
     },
   });
@@ -841,8 +961,10 @@ test('Multiple validation errors should return all error details', async () => {
         password: z.string().min(8),
       }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -851,7 +973,11 @@ test('Multiple validation errors should return all error details', async () => {
     contract,
     handlers: {
       createUser: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -888,8 +1014,10 @@ test('Query parameter validation should return 400 for invalid enum value', asyn
         filter: z.enum(['active', 'inactive', 'all']).optional(),
       }),
       responses: {
-        200: { body: z.object({ items: z.array(z.string()) }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        200: { 'application/json': { body: z.object({ items: z.array(z.string()) }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -898,7 +1026,11 @@ test('Query parameter validation should return 400 for invalid enum value', asyn
     contract,
     handlers: {
       listItems: async (request) => {
-        return request.json({ items: [] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { items: [] },
+        });
       },
     },
   });
@@ -923,8 +1055,10 @@ test('Body validation should return 400 for invalid URL format', async () => {
         url: z.string().url(),
       }),
       responses: {
-        201: { body: z.object({ id: z.string(), title: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), title: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -933,7 +1067,11 @@ test('Body validation should return 400 for invalid URL format', async () => {
     contract,
     handlers: {
       createLink: async (request) => {
-        return request.json({ id: '1', title: request.validatedBody.title }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', title: request.validatedBody.title },
+        });
       },
     },
   });
@@ -965,8 +1103,10 @@ test('Body validation should return 400 for invalid UUID format', async () => {
         referenceId: z.string().uuid(),
       }),
       responses: {
-        200: { body: z.object({ id: z.string(), name: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -975,7 +1115,11 @@ test('Body validation should return 400 for invalid UUID format', async () => {
     contract,
     handlers: {
       getUser: async (request) => {
-        return request.json({ id: request.params.id, name: request.validatedBody.name }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { id: request.params.id, name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -1007,8 +1151,10 @@ test('Validation error response should have correct Content-Type header', async 
         email: z.string().email(),
       }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
-        400: { body: z.object({ error: z.string(), details: z.unknown() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        400: {
+          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+        },
       },
     },
   });
@@ -1017,7 +1163,11 @@ test('Validation error response should have correct Content-Type header', async 
     contract,
     handlers: {
       createUser: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -1044,7 +1194,7 @@ test('Multiple operations should handle multiple operations in same router', asy
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
     getUser: {
@@ -1052,7 +1202,7 @@ test('Multiple operations should handle multiple operations in same router', asy
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { body: z.object({ id: z.string(), name: z.string() }) },
+        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
       },
     },
     createUser: {
@@ -1061,7 +1211,7 @@ test('Multiple operations should handle multiple operations in same router', asy
       method: 'POST',
       request: z.object({ name: z.string() }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
       },
     },
   });
@@ -1070,13 +1220,25 @@ test('Multiple operations should handle multiple operations in same router', asy
     contract,
     handlers: {
       getUsers: async (request) => {
-        return request.json({ users: ['user1', 'user2'] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: ['user1', 'user2'] },
+        });
       },
       getUser: async (request) => {
-        return request.json({ id: request.params.id, name: 'John' }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { id: request.params.id, name: 'John' },
+        });
       },
       createUser: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -1113,7 +1275,7 @@ test('Optional operationId should default to contract key', async () => {
       path: '/users/:id/profile',
       // method omitted - should default to 'GET'
       responses: {
-        200: { body: z.object({ id: z.string(), name: z.string() }) },
+        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
       },
     },
   });
@@ -1122,7 +1284,11 @@ test('Optional operationId should default to contract key', async () => {
     contract,
     handlers: {
       getUserProfile: async (request) => {
-        return request.json({ id: request.params.id, name: 'John Doe' }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { id: request.params.id, name: 'John Doe' },
+        });
       },
     },
   });
@@ -1142,7 +1308,7 @@ test('Optional method should default to GET', async () => {
       path: '/items',
       // method omitted - should default to 'GET'
       responses: {
-        200: { body: z.object({ items: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ items: z.array(z.string()) }) } },
       },
     },
   });
@@ -1151,7 +1317,11 @@ test('Optional method should default to GET', async () => {
     contract,
     handlers: {
       listItems: async (request) => {
-        return request.json({ items: ['item1', 'item2'] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { items: ['item1', 'item2'] },
+        });
       },
     },
   });
@@ -1170,7 +1340,7 @@ test('Explicit operationId should override contract key', async () => {
       operationId: 'customOperationId', // Explicit operationId should override key
       path: '/users/:id/profile',
       responses: {
-        200: { body: z.object({ id: z.string(), name: z.string() }) },
+        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
       },
     },
   });
@@ -1179,7 +1349,11 @@ test('Explicit operationId should override contract key', async () => {
     contract,
     handlers: {
       getUserProfile: async (request) => {
-        return request.json({ id: request.params.id, name: 'John Doe' }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { id: request.params.id, name: 'John Doe' },
+        });
       },
     },
   });
@@ -1200,7 +1374,7 @@ test('Explicit method should override default GET', async () => {
       method: 'POST', // Explicit method
       request: z.object({ name: z.string() }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
       },
     },
   });
@@ -1209,7 +1383,11 @@ test('Explicit method should override default GET', async () => {
     contract,
     handlers: {
       createItem: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
     },
   });
@@ -1236,8 +1414,12 @@ test('Nested routes with multiple path parameters should handle complex paths', 
       path: '/users/:userId/posts/:postId',
       method: 'GET',
       responses: {
-        200: { body: z.object({ userId: z.string(), postId: z.string(), title: z.string() }) },
-        404: { body: z.object({ error: z.string() }) },
+        200: {
+          'application/json': {
+            body: z.object({ userId: z.string(), postId: z.string(), title: z.string() }),
+          },
+        },
+        404: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -1246,14 +1428,15 @@ test('Nested routes with multiple path parameters should handle complex paths', 
     contract,
     handlers: {
       getUserPost: async (request) => {
-        return request.json(
-          {
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: {
             userId: request.params.userId,
             postId: request.params.postId,
             title: 'Test Post',
           },
-          200
-        );
+        });
       },
     },
   });
@@ -1280,7 +1463,9 @@ test('Complex query parameters with arrays should handle array query params', as
           .default(1),
       }),
       responses: {
-        200: { body: z.object({ items: z.array(z.string()), total: z.number() }) },
+        200: {
+          'application/json': { body: z.object({ items: z.array(z.string()), total: z.number() }) },
+        },
       },
     },
   });
@@ -1291,7 +1476,11 @@ test('Complex query parameters with arrays should handle array query params', as
       searchItems: async (request) => {
         const tags = request.validatedQuery.tags || [];
         const page = request.validatedQuery.page;
-        return request.json({ items: tags, total: page }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { items: tags, total: page },
+        });
       },
     },
   });
@@ -1316,8 +1505,12 @@ test('PUT request should handle update operations', async () => {
         email: z.email(),
       }),
       responses: {
-        200: { body: z.object({ id: z.string(), name: z.string(), email: z.string() }) },
-        404: { body: z.object({ error: z.string() }) },
+        200: {
+          'application/json': {
+            body: z.object({ id: z.string(), name: z.string(), email: z.string() }),
+          },
+        },
+        404: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -1326,14 +1519,15 @@ test('PUT request should handle update operations', async () => {
     contract,
     handlers: {
       updateUser: async (request) => {
-        return request.json(
-          {
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: {
             id: request.params.id,
             name: request.validatedBody.name,
             email: request.validatedBody.email,
           },
-          200
-        );
+        });
       },
     },
   });
@@ -1365,11 +1559,13 @@ test('PATCH request should handle partial updates', async () => {
       }),
       responses: {
         200: {
-          body: z.object({
-            id: z.string(),
-            name: z.string().optional(),
-            email: z.string().optional(),
-          }),
+          'application/json': {
+            body: z.object({
+              id: z.string(),
+              name: z.string().optional(),
+              email: z.string().optional(),
+            }),
+          },
         },
       },
     },
@@ -1379,14 +1575,15 @@ test('PATCH request should handle partial updates', async () => {
     contract,
     handlers: {
       patchUser: async (request) => {
-        return request.json(
-          {
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: {
             id: request.params.id,
             name: request.validatedBody.name,
             email: request.validatedBody.email,
           },
-          200
-        );
+        });
       },
     },
   });
@@ -1410,7 +1607,7 @@ test('Base path should prefix all routes', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
   });
@@ -1420,7 +1617,11 @@ test('Base path should prefix all routes', async () => {
     base: '/api/v1',
     handlers: {
       getUsers: async (request) => {
-        return request.json({ users: ['user1'] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: ['user1'] },
+        });
       },
     },
   });
@@ -1445,7 +1646,7 @@ test('Custom missing handler should handle 404 routes', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
   });
@@ -1455,11 +1656,19 @@ test('Custom missing handler should handle 404 routes', async () => {
     missing: async (request) => {
       // Request object may have url property or we can construct it
       const url = request.proxy?.url;
-      return request.json({ error: 'Custom 404: Route not found', url }, 404);
+      return request.respond({
+        status: 404,
+        contentType: 'application/json',
+        body: { error: 'Custom 404: Route not found', url },
+      });
     },
     handlers: {
       getUsers: async (request) => {
-        return request.json({ users: [] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: [] },
+        });
       },
     },
   });
@@ -1485,7 +1694,11 @@ test('Before middleware should run before handlers', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()), requestId: z.string() }) },
+        200: {
+          'application/json': {
+            body: z.object({ users: z.array(z.string()), requestId: z.string() }),
+          },
+        },
       },
     },
   });
@@ -1504,7 +1717,11 @@ test('Before middleware should run before handlers', async () => {
     handlers: {
       getUsers: async (request) => {
         const requestId = (request as any).requestId;
-        return request.json({ users: ['user1'], requestId }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: ['user1'], requestId },
+        });
       },
     },
   });
@@ -1524,7 +1741,7 @@ test('Finally middleware should run after handlers', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
   });
@@ -1542,7 +1759,11 @@ test('Finally middleware should run after handlers', async () => {
     ],
     handlers: {
       getUsers: async (request) => {
-        return request.json({ users: ['user1'] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: ['user1'] },
+        });
       },
     },
   });
@@ -1560,21 +1781,21 @@ test('Route precedence should match specific routes before general ones', async 
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ type: z.literal('list') }) },
+        200: { 'application/json': { body: z.object({ type: z.literal('list') }) } },
       },
     },
     getUser: {
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { body: z.object({ type: z.literal('single') }) },
+        200: { 'application/json': { body: z.object({ type: z.literal('single') }) } },
       },
     },
     getUserPosts: {
       path: '/users/:id/posts',
       method: 'GET',
       responses: {
-        200: { body: z.object({ type: z.literal('posts') }) },
+        200: { 'application/json': { body: z.object({ type: z.literal('posts') }) } },
       },
     },
   });
@@ -1583,13 +1804,25 @@ test('Route precedence should match specific routes before general ones', async 
     contract,
     handlers: {
       getUsers: async (request) => {
-        return request.json({ type: 'list' }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { type: 'list' },
+        });
       },
       getUser: async (request) => {
-        return request.json({ type: 'single' }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { type: 'single' },
+        });
       },
       getUserPosts: async (request) => {
-        return request.json({ type: 'posts' }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { type: 'posts' },
+        });
       },
     },
   });
@@ -1618,9 +1851,7 @@ test('URL encoding should handle special characters in paths', async () => {
     getUser: {
       path: '/users/:id',
       method: 'GET',
-      responses: {
-        200: { body: z.object({ id: z.string() }) },
-      },
+      responses: { 200: { 'application/json': { body: z.object({ id: z.string() }) } } },
     },
   });
 
@@ -1628,7 +1859,11 @@ test('URL encoding should handle special characters in paths', async () => {
     contract,
     handlers: {
       getUser: async (request) => {
-        return request.json({ id: request.params.id }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { id: request.params.id },
+        });
       },
     },
   });
@@ -1662,7 +1897,11 @@ test('Query parameters with special characters should be handled correctly', asy
         filter: z.string().optional(),
       }),
       responses: {
-        200: { body: z.object({ query: z.string(), filter: z.string().optional() }) },
+        200: {
+          'application/json': {
+            body: z.object({ query: z.string(), filter: z.string().optional() }),
+          },
+        },
       },
     },
   });
@@ -1671,13 +1910,14 @@ test('Query parameters with special characters should be handled correctly', asy
     contract,
     handlers: {
       search: async (request) => {
-        return request.json(
-          {
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: {
             query: request.validatedQuery.q,
             filter: request.validatedQuery.filter,
           },
-          200
-        );
+        });
       },
     },
   });
@@ -1712,7 +1952,7 @@ test('Complex nested body should handle nested objects and arrays', async () => 
         metadata: z.record(z.string(), z.unknown()).optional(),
       }),
       responses: {
-        201: { body: z.object({ orderId: z.string(), total: z.number() }) },
+        201: { 'application/json': { body: z.object({ orderId: z.string(), total: z.number() }) } },
       },
     },
   });
@@ -1723,7 +1963,11 @@ test('Complex nested body should handle nested objects and arrays', async () => 
       createOrder: async (request) => {
         const items = request.validatedBody.items;
         const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-        return request.json({ orderId: 'order-123', total }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { orderId: 'order-123', total },
+        });
       },
     },
   });
@@ -1762,8 +2006,10 @@ test('Handler throwing errors should be handled gracefully', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
-        500: { body: z.object({ error: z.string() }) },
+        200: {
+          'application/json': { body: z.object({ users: z.array(z.string()) }) },
+          500: { 'application/json': { body: z.object({ error: z.string() }) } },
+        },
       },
     },
   });
@@ -1805,8 +2051,10 @@ test('Multiple headers validation should handle case-insensitive headers', async
         'x-request-id': z.string().optional(),
       }),
       responses: {
-        200: { body: z.object({ message: z.string() }) },
-        401: { body: z.object({ error: z.string() }) },
+        200: {
+          'application/json': { body: z.object({ message: z.string() }) },
+          401: { 'application/json': { body: z.object({ error: z.string() }) } },
+        },
       },
     },
   });
@@ -1818,9 +2066,17 @@ test('Multiple headers validation should handle case-insensitive headers', async
         const auth = request.validatedHeaders.authorization;
         const apiKey = request.validatedHeaders['x-api-key'];
         if (auth && apiKey) {
-          return request.json({ message: 'Access granted' }, 200);
+          return request.respond({
+            status: 200,
+            contentType: 'application/json',
+            body: { message: 'Access granted' },
+          });
         }
-        return request.error(401, { error: 'Unauthorized' });
+        return request.respond({
+          status: 401,
+          contentType: 'application/json',
+          body: { error: 'Unauthorized' },
+        });
       },
     },
   });
@@ -1847,13 +2103,13 @@ test('Response headers should be set correctly', async () => {
       method: 'GET',
       responses: {
         200: {
-          body: z.object({ users: z.array(z.string()) }),
-          headers: z
-            .object({
-              'X-Total-Count': z.string().optional(),
-              'Cache-Control': z.string().optional(),
-            })
-            .optional(),
+          'application/json': {
+            body: z.object({ users: z.array(z.string()) }),
+          },
+          headers: z.object({
+            'X-Total-Count': z.string().optional(),
+            'Cache-Control': z.string().optional(),
+          }),
         },
       },
     },
@@ -1865,9 +2121,14 @@ test('Response headers should be set correctly', async () => {
       getUsers: async (request) => {
         // Response helpers return objects with status, body, and optional headers
         // Headers should be passed as the third parameter
-        return request.json({ users: ['user1'] }, 200, {
-          'X-Total-Count': '1',
-          'Cache-Control': 'max-age=3600',
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: ['user1'] },
+          headers: {
+            'X-Total-Count': '1',
+            'Cache-Control': 'max-age=3600',
+          },
         });
       },
     },
@@ -1892,7 +2153,11 @@ test('Empty query parameters should handle optional params', async () => {
         sort: z.enum(['asc', 'desc']).optional(),
       }),
       responses: {
-        200: { body: z.object({ items: z.array(z.string()), page: z.number().optional() }) },
+        200: {
+          'application/json': {
+            body: z.object({ items: z.array(z.string()), page: z.number().optional() }),
+          },
+        },
       },
     },
   });
@@ -1904,7 +2169,11 @@ test('Empty query parameters should handle optional params', async () => {
         const page = request.validatedQuery.page
           ? parseInt(request.validatedQuery.page, 10)
           : undefined;
-        return request.json({ items: ['item1'], page }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { items: ['item1'], page },
+        });
       },
     },
   });
@@ -1934,7 +2203,7 @@ test('Empty body should handle optional body validation', async () => {
         notifications: z.boolean().optional(),
       }),
       responses: {
-        200: { body: z.object({ updated: z.boolean() }) },
+        200: { 'application/json': { body: z.object({ updated: z.boolean() }) } },
       },
     },
   });
@@ -1943,7 +2212,11 @@ test('Empty body should handle optional body validation', async () => {
     contract,
     handlers: {
       updateSettings: async (request) => {
-        return request.json({ updated: true }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { updated: true },
+        });
       },
     },
   });
@@ -1967,7 +2240,7 @@ test('Same path different methods should handle route conflicts correctly', asyn
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
     createUser: {
@@ -1975,7 +2248,7 @@ test('Same path different methods should handle route conflicts correctly', asyn
       method: 'POST',
       request: z.object({ name: z.string() }),
       responses: {
-        201: { body: z.object({ id: z.string(), name: z.string() }) },
+        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
       },
     },
     updateUsers: {
@@ -1983,14 +2256,14 @@ test('Same path different methods should handle route conflicts correctly', asyn
       method: 'PUT',
       request: z.object({ users: z.array(z.string()) }),
       responses: {
-        200: { body: z.object({ updated: z.number() }) },
+        200: { 'application/json': { body: z.object({ updated: z.number() }) } },
       },
     },
     deleteUsers: {
       path: '/users',
       method: 'DELETE',
       responses: {
-        204: { body: z.never() },
+        204: { 'application/json': { body: z.undefined() } },
       },
     },
   });
@@ -1999,16 +2272,28 @@ test('Same path different methods should handle route conflicts correctly', asyn
     contract,
     handlers: {
       getUsers: async (request) => {
-        return request.json({ users: ['user1'] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: ['user1'] },
+        });
       },
       createUser: async (request) => {
-        return request.json({ id: '1', name: request.validatedBody.name }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { id: '1', name: request.validatedBody.name },
+        });
       },
       updateUsers: async (request) => {
-        return request.json({ updated: request.validatedBody.users.length }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { updated: request.validatedBody.users.length },
+        });
       },
       deleteUsers: async (request) => {
-        return request.noContent(204);
+        return request.respond({ status: 204, contentType: 'application/json', body: undefined });
       },
     },
   });
@@ -2048,7 +2333,7 @@ test('Path parameters with special characters should be preserved', async () => 
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { body: z.object({ id: z.string() }) },
+        200: { 'application/json': { body: z.object({ id: z.string() }) } },
       },
     },
   });
@@ -2057,7 +2342,11 @@ test('Path parameters with special characters should be preserved', async () => 
     contract,
     handlers: {
       getUser: async (request) => {
-        return request.json({ id: request.params.id }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { id: request.params.id },
+        });
       },
     },
   });
@@ -2091,9 +2380,7 @@ test('Large payload should handle big request bodies', async () => {
           })
         ),
       }),
-      responses: {
-        201: { body: z.object({ created: z.number() }) },
-      },
+      responses: { 201: { 'application/json': { body: z.object({ created: z.number() }) } } },
     },
   });
 
@@ -2101,7 +2388,11 @@ test('Large payload should handle big request bodies', async () => {
     contract,
     handlers: {
       bulkCreate: async (request) => {
-        return request.json({ created: request.validatedBody.items.length }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { created: request.validatedBody.items.length },
+        });
       },
     },
   });
@@ -2146,11 +2437,13 @@ test('Query parameter transformations should handle complex transforms', async (
       }),
       responses: {
         200: {
-          body: z.object({
-            page: z.number(),
-            limit: z.number(),
-            includeDeleted: z.boolean().optional(),
-          }),
+          'application/json': {
+            body: z.object({
+              page: z.number(),
+              limit: z.number(),
+              includeDeleted: z.boolean().optional(),
+            }),
+          },
         },
       },
     },
@@ -2160,14 +2453,15 @@ test('Query parameter transformations should handle complex transforms', async (
     contract,
     handlers: {
       search: async (request) => {
-        return request.json(
-          {
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: {
             page: request.validatedQuery.page,
             limit: request.validatedQuery.limit,
             includeDeleted: request.validatedQuery.includeDeleted,
           },
-          200
-        );
+        });
       },
     },
   });
@@ -2200,7 +2494,7 @@ test('Union types in body should handle discriminated unions', async () => {
         }),
       ]),
       responses: {
-        201: { body: z.object({ eventId: z.string(), type: z.string() }) },
+        201: { 'application/json': { body: z.object({ eventId: z.string(), type: z.string() }) } },
       },
     },
   });
@@ -2210,7 +2504,11 @@ test('Union types in body should handle discriminated unions', async () => {
     handlers: {
       createEvent: async (request) => {
         const event = request.validatedBody;
-        return request.json({ eventId: 'evt-123', type: event.type }, 201);
+        return request.respond({
+          status: 201,
+          contentType: 'application/json',
+          body: { eventId: 'evt-123', type: event.type },
+        });
       },
     },
   });
