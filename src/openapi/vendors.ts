@@ -65,6 +65,37 @@ function getZodModule(): any {
 }
 
 /**
+ * Get @valibot/to-json-schema module dynamically
+ *
+ * Uses string-based require to prevent bundlers from statically analyzing and bundling the package.
+ *
+ * @throws Error if @valibot/to-json-schema cannot be loaded or doesn't have toJsonSchema method
+ */
+function getValibotToJsonSchemaModule(): any {
+  // Use string concatenation to prevent static analysis by bundlers
+  const valibotToJsonSchemaPath = '@valibot/to-json-schema';
+
+  try {
+    const require = getRequire();
+    const valibotToJsonSchema = require(valibotToJsonSchemaPath);
+    if (valibotToJsonSchema && typeof valibotToJsonSchema.toJsonSchema === 'function') {
+      return valibotToJsonSchema;
+    }
+    throw new Error(
+      'toJsonSchema() is not available from @valibot/to-json-schema. Please ensure you have the correct version installed.'
+    );
+  } catch (err: any) {
+    if (err.code === 'MODULE_NOT_FOUND') {
+      throw new Error(
+        '@valibot/to-json-schema is required for valibot schema extraction. Please install it: npm install @valibot/to-json-schema'
+      );
+    }
+    // Re-throw if it's our custom error about missing toJsonSchema
+    throw err;
+  }
+}
+
+/**
  * Extract JSON Schema from a Zod schema and convert to OpenAPI SchemaObject
  *
  * Note: This function requires zod to be installed. Users must install zod when using zod schemas.
@@ -79,6 +110,33 @@ function extractZodSchema(schema: StandardSchemaV1): OpenAPIV3_1.SchemaObject {
     target: 'openapi-3.0',
     reused: 'ref',
     unrepresentable: 'any',
+  });
+
+  // Convert JSON Schema to OpenAPI SchemaObject
+  return convertJsonSchemaToOpenAPI(jsonSchema);
+}
+
+/**
+ * Extract JSON Schema from a Valibot schema and convert to OpenAPI SchemaObject
+ *
+ * Note: This function requires @valibot/to-json-schema to be installed. Users must install
+ * @valibot/to-json-schema when using valibot schemas. The function will attempt to access
+ * @valibot/to-json-schema through the module system at runtime.
+ *
+ * Note: Some Valibot transformations (like toNumber) cannot be converted to JSON Schema.
+ * In such cases, errorMode: 'warn' is used to allow conversion while showing warnings,
+ * and the input type will be used for OpenAPI documentation (which is correct since
+ * OpenAPI should document what the API receives, not internal transformations).
+ */
+function extractValibotSchema(schema: StandardSchemaV1): OpenAPIV3_1.SchemaObject {
+  const { toJsonSchema } = getValibotToJsonSchemaModule();
+
+  // Get JSON Schema from valibot using toJsonSchema
+  // Use typeMode: 'input' since we're validating input data and documenting what the API receives
+  // Use errorMode: 'warn' to allow conversion even when transformations can't be represented
+  const jsonSchema = toJsonSchema(schema, {
+    typeMode: 'input',
+    errorMode: 'warn',
   });
 
   // Convert JSON Schema to OpenAPI SchemaObject
@@ -299,8 +357,8 @@ function convertJsonSchemaToOpenAPI(jsonSchema: any): OpenAPIV3_1.SchemaObject {
  */
 const vendorExtractors: Record<string, SchemaExtractor> = {
   zod: extractZodSchema,
+  valibot: extractValibotSchema,
   // Future vendors can be added here:
-  // valibot: extractValibotSchema,
   // arktype: extractArktypeSchema,
 };
 
