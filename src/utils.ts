@@ -1,12 +1,22 @@
 import type {
   ContractOperation,
-  ContractOperationStatusCodes,
-  ContractOperationResponseBody,
-  ContractOperationResponseHeaders,
   ContractOperationResponseHelpers,
   ResponseVariant,
+  ResponseSchema,
+  ResponseByContentType,
 } from './types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
+
+/**
+ * Get response schema for a specific content type
+ * Returns the schema for the content type, or null if not found
+ */
+export function getResponseSchemaForContentType(
+  response: ResponseByContentType,
+  contentType: string
+): ResponseSchema | null {
+  return response[contentType] || null;
+}
 
 /**
  * Create a response object with optional headers
@@ -18,68 +28,74 @@ function createResponse(status: number, body: unknown, headers?: unknown) {
 }
 
 /**
- * Basic response helper methods for use in missing handlers
- * These helpers don't validate against a contract schema since there's no operation context
+ * Basic response helper for use in missing handlers
+ * This helper doesn't validate against a contract schema since there's no operation context
  *
- * @returns An object with json, html, noContent, and error helper methods
+ * @returns An object with respond() method
  */
 export function createBasicResponseHelpers() {
   return {
-    json: (body: unknown, status: number, headers?: HeadersInit): Response =>
-      createResponse(status, body, headers),
-    html: (html: string, status: number = 200, headers?: HeadersInit): Response => {
-      const responseHeaders = new Headers(headers);
-      if (!responseHeaders.has('Content-Type')) {
-        responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
+    respond: (options: {
+      status: number;
+      contentType: string;
+      body?: unknown;
+      headers?: HeadersInit;
+    }): Response => {
+      const { status, contentType, body, headers } = options;
+      const responseHeaders = headers ? new Headers(headers) : new Headers();
+
+      // Set content-type header if not already set
+      if (!responseHeaders.has('content-type')) {
+        if (contentType === 'text/html') {
+          responseHeaders.set('content-type', 'text/html; charset=utf-8');
+        } else {
+          responseHeaders.set('content-type', contentType);
+        }
       }
-      return createResponse(status, html, responseHeaders);
+
+      return createResponse(status, body, responseHeaders);
     },
-    noContent: (status: number): Response => createResponse(status, undefined),
-    error: (status: number, body: unknown, headers?: HeadersInit): Response =>
-      createResponse(status, body, headers),
   };
 }
 
 /**
- * Create typed response helpers for a contract operation
- * These helpers provide type-safe response creation methods that validate against the contract
+ * Create typed response helper for a contract operation
+ * Provides a single respond() method that validates against the contract
  *
  * @param _operation - The contract operation (used for type inference, not runtime)
- * @returns Typed response helper methods (json, html, error, noContent) that match the contract
+ * @returns Typed respond() method that matches the contract
  */
 export function createResponseHelpers<TOperation extends ContractOperation>(
   _operation: TOperation
 ): ContractOperationResponseHelpers<TOperation> {
   return {
-    json(body: unknown, status?: number, headers?: unknown): any {
-      const finalStatus = (status ?? 200) as ContractOperationStatusCodes<TOperation>;
-      return createResponse(finalStatus, body, headers) as ResponseVariant<
-        TOperation,
-        typeof finalStatus
-      >;
-    },
-    html(html: string, status?: number, headers?: unknown): any {
-      const finalStatus = (status ?? 200) as ContractOperationStatusCodes<TOperation>;
+    respond(options: {
+      status: number;
+      contentType: string;
+      body: unknown;
+      headers?: unknown;
+    }): any {
+      const { status, contentType, body, headers } = options;
       const responseHeaders = headers ? new Headers(headers as HeadersInit) : new Headers();
-      if (!responseHeaders.has('Content-Type')) {
-        responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
+
+      // Set content-type header if not already set
+      if (!responseHeaders.has('content-type')) {
+        // Handle special case for HTML
+        if (contentType === 'text/html') {
+          responseHeaders.set('content-type', 'text/html; charset=utf-8');
+        } else {
+          responseHeaders.set('content-type', contentType);
+        }
       }
-      return createResponse(finalStatus, html, responseHeaders) as ResponseVariant<
+
+      // Only include headers if they were provided or if content-type was set
+      const finalHeaders =
+        headers || responseHeaders.has('content-type') ? responseHeaders : undefined;
+
+      return createResponse(status, body, finalHeaders) as ResponseVariant<
         TOperation,
-        typeof finalStatus
+        typeof status
       >;
-    },
-    noContent<S extends ContractOperationStatusCodes<TOperation> & 204>(
-      status: S
-    ): ResponseVariant<TOperation, S> {
-      return createResponse(status, undefined) as ResponseVariant<TOperation, S>;
-    },
-    error<S extends ContractOperationStatusCodes<TOperation>>(
-      status: S,
-      body: ContractOperationResponseBody<TOperation, S>,
-      headers?: ContractOperationResponseHeaders<TOperation, S>
-    ): ResponseVariant<TOperation, S> {
-      return createResponse(status, body, headers) as ResponseVariant<TOperation, S>;
     },
   };
 }

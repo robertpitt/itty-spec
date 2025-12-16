@@ -74,11 +74,37 @@ function extractZodSchema(schema: StandardSchemaV1): OpenAPIV3_1.SchemaObject {
   const z = getZodModule();
 
   // Get JSON Schema from zod using the static toJSONSchema method
-  const jsonSchema = z.toJSONSchema(schema, { io: 'input' });
+  const jsonSchema = z.toJSONSchema(schema, {
+    io: 'input',
+    target: 'openapi-3.0',
+    reused: 'ref',
+    unrepresentable: 'any',
+  });
 
   // Convert JSON Schema to OpenAPI SchemaObject
   return convertJsonSchemaToOpenAPI(jsonSchema);
 }
+
+/**
+ * Standard OpenAPI formats that have implicit validation rules
+ * When these formats are present, we should not include the pattern property
+ * as the format itself already implies validation
+ */
+const STANDARD_OPENAPI_FORMATS = new Set([
+  'email',
+  'uri',
+  'uri-reference',
+  'date',
+  'date-time',
+  'time',
+  'uuid',
+  'hostname',
+  'ipv4',
+  'ipv6',
+  'json-pointer',
+  'relative-json-pointer',
+  'regex',
+]);
 
 /**
  * Convert JSON Schema to OpenAPI SchemaObject format
@@ -129,7 +155,12 @@ function convertJsonSchemaToOpenAPI(jsonSchema: any): OpenAPIV3_1.SchemaObject {
   if (jsonSchema.format !== undefined) {
     openApiSchema.format = jsonSchema.format;
   }
-  if (jsonSchema.pattern !== undefined) {
+  // Only include pattern if format is not a standard OpenAPI format
+  // Standard formats already have implicit validation rules
+  if (
+    jsonSchema.pattern !== undefined &&
+    (!jsonSchema.format || !STANDARD_OPENAPI_FORMATS.has(jsonSchema.format))
+  ) {
     openApiSchema.pattern = jsonSchema.pattern;
   }
   if (jsonSchema.minLength !== undefined) {
