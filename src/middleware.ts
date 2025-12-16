@@ -459,6 +459,17 @@ export function withContractErrorHandler<
         { status: 400, headers: { 'content-type': 'application/json' } }
       );
     }
-    return error(400, request);
+
+    // Handle other errors - return error message without circular reference issues
+    const errorMessage = err instanceof Error ? err.message : 'Internal server error';
+    const statusCode =
+      err && typeof err === 'object' && 'status' in err ? (err as any).status : 500;
+
+    return new Response(
+      JSON.stringify({
+        error: errorMessage,
+      }),
+      { status: statusCode, headers: { 'content-type': 'application/json' } }
+    );
   };
 }

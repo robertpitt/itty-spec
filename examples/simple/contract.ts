@@ -126,7 +126,7 @@ export const contract = createContract({
     responses: {
       200: {
         'application/json': {
-          body: CalculateResponse,
+          body: CalculateResponse.extend({ test: z.number().min(0).max(100) }),
           headers: z.object({ 'content-type': z.literal('application/json') }),
         },
         'text/html': {
@@ -161,16 +161,28 @@ export const contract = createContract({
     summary: 'Calculate',
     description: 'Calculate the sum of two numbers',
     headers: z.object({
-      'content-type': z.enum(['application/json', 'text/html', 'application/xml']),
-      accept: z.enum(['application/json', 'application/multipart-form-data']),
+      accept: z.enum(['application/json', 'application/multipart-form-data']).optional(),
     }),
     requests: {
       'application/json': { body: CalculatePostRequest },
       'application/multipart-form-data': {
-        body: z.codec(z.string().min(1).max(10000), z.object({ a: z.number(), b: z.number() }), {
-          decode: (val) => new URLSearchParams(val).toJSON() as unknown as { a: number; b: number },
-          encode: (val) => new URLSearchParams(val as unknown as Record<string, string>).toString(),
-        }),
+        body: z.codec(
+          z.string().min(1).max(10000),
+          z.object({
+            a: z.string().transform((val) => parseInt(val, 10)),
+            b: z.string().transform((val) => parseInt(val, 10)),
+          }),
+          {
+            decode: (val) =>
+              Object.fromEntries(new URLSearchParams(val).entries()) as unknown as {
+                a: string;
+                b: string;
+                [x: string]: string;
+              },
+            encode: (val) =>
+              new URLSearchParams(val as unknown as Record<string, string>).toString(),
+          }
+        ),
       },
     },
     responses: {
