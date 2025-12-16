@@ -111,6 +111,32 @@ function sanitizeContentType(contentType: string): string {
 }
 
 /**
+ * Type guard to validate request/response schema objects
+ */
+function isValidBodySchema(
+  schema: unknown
+): schema is { body?: StandardSchemaV1; headers?: StandardSchemaV1 } {
+  return Boolean(schema && typeof schema === 'object' && 'body' in schema);
+}
+
+/**
+ * Generic helper to process content-type maps
+ */
+function processContentTypeMap(
+  contentMap: Record<string, unknown>,
+  processor: (
+    contentType: string,
+    schema: { body?: StandardSchemaV1; headers?: StandardSchemaV1 }
+  ) => void
+): void {
+  for (const [contentType, schema] of Object.entries(contentMap)) {
+    if (isValidBodySchema(schema)) {
+      processor(contentType, schema);
+    }
+  }
+}
+
+/**
  * Create a schema reference object
  */
 function createSchemaRef(schemaId: string): OpenAPIV3_1.ReferenceObject {
@@ -232,25 +258,19 @@ function createRequestBodyContent(
 ): Record<string, OpenAPIV3_1.MediaTypeObject> {
   const content: Record<string, OpenAPIV3_1.MediaTypeObject> = {};
 
-  for (const [contentType, requestSchema] of Object.entries(requests)) {
-    if (!requestSchema || typeof requestSchema !== 'object' || !('body' in requestSchema)) {
-      continue;
-    }
-
-    if (requestSchema.body) {
-      const contentTypeSafe = sanitizeContentType(contentType);
+  processContentTypeMap(requests, (contentType, schema) => {
+    if (schema.body) {
       const bodySchemaId = getOrCreateSchemaReference(
-        requestSchema.body,
+        schema.body,
         registry,
-        `${operationId}Request${contentTypeSafe}Body`
+        `${operationId}Request${sanitizeContentType(contentType)}Body`
       );
-
       const mediaTypeObj = createMediaTypeObject(bodySchemaId);
       if (mediaTypeObj) {
         content[contentType] = mediaTypeObj;
       }
     }
-  }
+  });
 
   return content;
 }
@@ -270,22 +290,17 @@ function createResponseContent(
   const content: Record<string, OpenAPIV3_1.MediaTypeObject> = {};
   const allHeaders: Record<string, OpenAPIV3_1.HeaderObject> = {};
 
-  for (const [contentType, responseSchema] of Object.entries(responseByContentType)) {
-    if (!responseSchema || typeof responseSchema !== 'object' || !('body' in responseSchema)) {
-      continue;
-    }
-
+  processContentTypeMap(responseByContentType, (contentType, schema) => {
     const mediaTypeObj: OpenAPIV3_1.MediaTypeObject = {};
+    const responseSchema = schema as { body?: StandardSchemaV1; headers?: StandardSchemaV1 };
 
     // Response body schema
     if (responseSchema.body) {
-      const contentTypeSafe = sanitizeContentType(contentType);
       const bodySchemaId = getOrCreateSchemaReference(
         responseSchema.body,
         registry,
-        `${operationId}Response${statusCode}${contentTypeSafe}Body`
+        `${operationId}Response${statusCode}${sanitizeContentType(contentType)}Body`
       );
-
       const mediaTypeWithSchema = createMediaTypeObject(bodySchemaId);
       if (mediaTypeWithSchema?.schema) {
         mediaTypeObj.schema = mediaTypeWithSchema.schema;
@@ -307,9 +322,28 @@ function createResponseContent(
     }
 
     content[contentType] = mediaTypeObj;
-  }
+  });
 
   return { content, headers: allHeaders };
+}
+
+/**
+ * Collect body schemas from a content-type map
+ */
+function collectBodySchemas(
+  contentMap: Record<string, unknown>,
+  registry: SchemaRegistry,
+  schemaNamePrefix: string
+): void {
+  processContentTypeMap(contentMap, (contentType, schema) => {
+    if (schema.body) {
+      getOrCreateSchemaReference(
+        schema.body,
+        registry,
+        `${schemaNamePrefix}${sanitizeContentType(contentType)}Body`
+      );
+    }
+  });
 }
 
 /**
@@ -320,18 +354,7 @@ function collectRequestBodySchemas(
   registry: SchemaRegistry,
   operationId: string
 ): void {
-  for (const [contentType, requestSchema] of Object.entries(requests)) {
-    if (requestSchema && typeof requestSchema === 'object' && 'body' in requestSchema) {
-      if (requestSchema.body) {
-        const contentTypeSafe = sanitizeContentType(contentType);
-        getOrCreateSchemaReference(
-          requestSchema.body,
-          registry,
-          `${operationId}Request${contentTypeSafe}Body`
-        );
-      }
-    }
-  }
+  collectBodySchemas(requests, registry, `${operationId}Request`);
 }
 
 /**
@@ -344,19 +367,11 @@ function collectResponseBodySchemas(
 ): void {
   for (const [statusCode, response] of Object.entries(responses)) {
     if (!response || typeof response !== 'object') continue;
-
-    const responseByContentType = response as ResponseByContentType;
-    for (const [contentType, responseSchema] of Object.entries(responseByContentType)) {
-      if (responseSchema && typeof responseSchema === 'object' && 'body' in responseSchema) {
-        if (responseSchema.body) {
-          getOrCreateSchemaReference(
-            responseSchema.body,
-            registry,
-            `${operationId}Response${statusCode}${sanitizeContentType(contentType)}Body`
-          );
-        }
-      }
-    }
+    collectBodySchemas(
+      response as ResponseByContentType,
+      registry,
+      `${operationId}Response${statusCode}`
+    );
   }
 }
 

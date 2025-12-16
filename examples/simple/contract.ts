@@ -126,7 +126,7 @@ export const contract = createContract({
     responses: {
       200: {
         'application/json': {
-          body: CalculateResponse.extend({ test: z.number().min(0).max(100) }),
+          body: CalculateResponse,
           headers: z.object({ 'content-type': z.literal('application/json') }),
         },
         'text/html': {

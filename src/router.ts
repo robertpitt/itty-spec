@@ -71,84 +71,56 @@ export const createRouter = <
 >(
   options: ContractRouterOptions<TContract, RequestType, Args>
 ) => {
-  // Create missing handler middleware
-  // In itty-router, middleware that returns something stops execution
-  // If no route matches, this will be called to handle 404s
   const missingHandler: ResponseHandler = (
     response: unknown,
     request: unknown,
     ...args: unknown[]
   ) => {
-    // If a response was already returned, pass it through
-    if (response != null) {
-      return response as Response;
-    }
-
-    // No response means no route matched - handle missing route
-    const requestWithHelpers = {
-      ...(request as RequestType),
-      ...createBasicResponseHelpers(),
-    } as RequestType & ReturnType<typeof createBasicResponseHelpers>;
-
+    if (response != null) return response as Response;
     if (options.missing) {
-      return options.missing(requestWithHelpers, ...(args as Args));
+      return options.missing(
+        { ...(request as RequestType), ...createBasicResponseHelpers() } as RequestType &
+          ReturnType<typeof createBasicResponseHelpers>,
+        ...(args as Args)
+      );
     }
     return error(404);
   };
 
-  // Build middleware chain following itty-router patterns:
-  // - before: runs before route handlers, doesn't return to continue
-  // - catch: handles errors thrown during execution
-  // - finally: runs after §handlers, can transform responses
+  const before = [
+    withParams as unknown as (request: RequestType, ...args: Args) => void,
+    withMatchingContractOperation(options.contract, options.base),
+    withPathParams,
+    withQueryParams,
+    withHeaders,
+    withBody,
+    withResponseHelpers,
+  ];
+  if (options.before) before.push(...options.before);
+
+  const finally_ = [missingHandler, withContractFormat(options.format)];
+  if (options.finally) finally_.push(...options.finally);
+
   const router = Router<RequestType, Args, Response>({
     base: options.base,
-    before: [
-      withParams as unknown as (request: RequestType, ...args: Args) => void,
-      // Attach the contract to the request object
-      withMatchingContractOperation(options.contract, options.base),
-      // Use the contract operation to validate the request path
-      withPathParams,
-      // Use the contract operation to validate the request query params
-      withQueryParams,
-      // Use the contract operation to validate the request headers
-      withHeaders,
-      // Use the contract operation to validate the request body
-      withBody,
-      // Use the contract operation to validate the response
-      withResponseHelpers,
-      // Pass user defined before middleware to the chain
-      ...(options.before || []),
-    ],
-    // Handle errors thrown during execution
+    before,
     catch: withContractErrorHandler<RequestType, Args>(),
-    finally: [
-      // handle not found routes
-      missingHandler,
-      withContractFormat(options.format),
-      ...(options.finally || []),
-    ],
+    finally: finally_,
   });
 
-  // Register routes - middleware is now global, so we only need to register handlers
   for (const [contractKey, operation] of Object.entries(options.contract)) {
     const handler = options.handlers[contractKey as keyof TContract];
     if (!handler) continue;
-
-    // Validate that method is explicitly provided
     if (!operation.method) {
       throw new Error(
         `Contract operation "${contractKey}" must explicitly specify a method. ` +
           `Found: undefined. Please add method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS'`
       );
     }
-
-    const operationWithDefaults = {
-      ...operation,
-      operationId: operation.operationId ?? contractKey,
-    };
-    const method = operationWithDefaults.method.toLowerCase() as Lowercase<HttpMethod>;
-    router[method]<IRequest, Args>(operation.path, async (request: IRequest, ...args: Args) =>
-      handler(request as ContractRequest<TContract[keyof TContract]>, ...args)
+    router[operation.method.toLowerCase() as Lowercase<HttpMethod>]<IRequest, Args>(
+      operation.path,
+      async (request: IRequest, ...args: Args) =>
+        handler(request as ContractRequest<TContract[keyof TContract]>, ...args)
     );
   }
 
