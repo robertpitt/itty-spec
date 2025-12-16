@@ -19,23 +19,7 @@ const openApiSpecification = createOpenApiSpecification(contract, {
   title: 'Simple API',
   version: '1.0.0',
   // markdown description showing of the markdown syntax
-  description: `
-    # Simple API
-    This is a simple API that demonstrates the use of the contract-router library.
-    It is a basic API that allows you to calculate the sum of two numbers.
-    It also provides a documentation endpoint that allows you to view the API documentation.
-
-    ## Calculating the sum of two numbers
-    To calculate the sum of two numbers, you can use the following endpoint:
-    \`\`\`
-    GET /calculate
-    \`\`\`
-    The request body should be a JSON object with the following properties:
-    \`\`\`
-    { "a": 1, "b": 2 }
-    \`\`\`
-    The response will be a JSON object with the following properties:
-    `,
+  description: `# Simple API\nThis is a simple API that demonstrates the use of the contract-router library.\nIt is a basic API that allows you to calculate the sum of two numbers.\nIt also provides a documentation endpoint that allows you to view the API documentation.\n## Calculating the sum of two numbers\nTo calculate the sum of two numbers, you can use the following endpoint:`,
 });
 
 const router = createRouter({
@@ -149,5 +133,5 @@ const adapter = createServerAdapter(router.fetch);
 const server = createServer(adapter);
 
 server.listen(3000, () => {
-  console.log('Server is running on port 3000');
+  console.log('Server is running on port http://localhost:3000');
 });

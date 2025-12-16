@@ -151,7 +151,7 @@ test('createRouter should use custom missing handler', async () => {
     missing: async (request) => {
       return new Response(JSON.stringify({ error: 'Not found' }), {
         status: 404,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'content-type': 'application/json' },
       });
     },
   });

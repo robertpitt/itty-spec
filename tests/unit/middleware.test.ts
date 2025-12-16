@@ -197,7 +197,7 @@ describe('withHeaders', () => {
 
     const middleware = withHeaders(operation);
     const headers = new Headers();
-    headers.set('Authorization', 'Bearer token');
+    headers.set('authorization', 'Bearer token');
     const request = createMockRequest({
       url: 'http://example.com/test',
       headers,
@@ -205,8 +205,8 @@ describe('withHeaders', () => {
 
     await middleware(request);
 
-    expect((request as any).validatedHeaders).toHaveProperty('Authorization');
-    expect((request.validatedHeaders as Record<string, string>).Authorization).toBe('Bearer token');
+    expect((request as any).validatedHeaders).toHaveProperty('authorization');
+    expect((request.validatedHeaders as Record<string, string>).authorization).toBe('Bearer token');
   });
 
   test('withHeaders should validate headers against schema when provided', async () => {
@@ -244,12 +244,12 @@ describe('withHeaders', () => {
     const middleware = withHeaders(operation);
     const request = createMockRequest({
       url: 'http://example.com/test',
-      headers: { Authorization: 'Bearer token' },
+      headers: { authorization: 'Bearer token' },
     });
 
     await middleware(request);
 
-    expect((request as any).validatedHeaders).toHaveProperty('Authorization');
+    expect(request.validatedHeaders).toHaveProperty('authorization');
   });
 });
 
@@ -259,7 +259,11 @@ describe('withBody', () => {
       operationId: 'test',
       path: '/test',
       method: 'POST',
-      request: z.object({ name: z.string(), email: z.string() }),
+      requests: {
+        'application/json': {
+          body: z.object({ name: z.string(), email: z.string() }),
+        },
+      },
       responses: { 200: { body: z.object({ message: z.string() }) } },
     };
 
@@ -267,6 +271,7 @@ describe('withBody', () => {
     const bodyText = JSON.stringify({ name: 'John', email: 'john@example.com' });
     const request = createMockRequest({
       url: 'http://example.com/test',
+      headers: { 'content-type': 'application/json' },
       text: async () => bodyText,
     });
 
@@ -300,7 +305,11 @@ describe('withBody', () => {
       operationId: 'test',
       path: '/test',
       method: 'POST',
-      request: z.object({ name: z.string() }),
+      requests: {
+        'application/json': {
+          body: z.object({ name: z.string() }),
+        },
+      },
       responses: { 200: { body: z.object({ message: z.string() }) } },
     };
 
@@ -326,8 +335,8 @@ describe('withResponseHelpers', () => {
       path: '/test',
       method: 'GET',
       responses: {
-        200: { body: z.object({ message: z.string() }) },
-        400: { body: z.object({ error: z.string() }) },
+        200: { 'application/json': { body: z.object({ message: z.string() }) } },
+        400: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     };
 
@@ -366,7 +375,7 @@ describe('withContractFormat', () => {
     expect(result.body).toBeNull();
   });
 
-  test('withContractFormat should set Content-Type header for JSON responses', () => {
+  test('withContractFormat should set content-type header for JSON responses', () => {
     const formatter = withContractFormat();
     const contractResponse = {
       status: 200,
@@ -374,7 +383,7 @@ describe('withContractFormat', () => {
     };
     const result = formatter(contractResponse, createMockRequest());
 
-    expect(result.headers.get('Content-Type')).toBe('application/json');
+    expect(result.headers.get('content-type')).toBe('application/json');
   });
 
   test('withContractFormat should preserve custom headers', () => {
@@ -382,11 +391,11 @@ describe('withContractFormat', () => {
     const contractResponse = {
       status: 200,
       body: { message: 'test' },
-      headers: { 'X-Custom-Header': 'value' },
+      headers: { 'x-custom-header': 'value' },
     };
     const result = formatter(contractResponse, createMockRequest());
 
-    expect(result.headers.get('X-Custom-Header')).toBe('value');
+    expect(result.headers.get('x-custom-header')).toBe('value');
   });
 
   test('withContractFormat should use custom formatter as fallback', async () => {

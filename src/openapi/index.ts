@@ -1,5 +1,11 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec';
-import { ContractDefinition, ContractOperation, HttpMethod, ResponseByContentType } from '../types';
+import {
+  ContractDefinition,
+  ContractOperation,
+  HttpMethod,
+  RequestByContentType,
+  ResponseByContentType,
+} from '../types';
 import { OpenAPIV3_1 } from './types';
 import { extractSchema } from './vendors';
 
@@ -164,9 +170,22 @@ function collectSchemasFromOperation(
   registry: SchemaRegistry,
   operationId: string
 ): void {
-  // Request body
-  if (operation.request) {
-    getOrCreateSchemaReference(operation.request, registry, `${operationId}Request`);
+  // Request body - only supports content-type map format
+  if (operation.requests) {
+    // Collect all body schemas from content-type map
+    const requestByContentType = operation.requests as RequestByContentType;
+    for (const [contentType, requestSchema] of Object.entries(requestByContentType)) {
+      if (requestSchema && typeof requestSchema === 'object' && 'body' in requestSchema) {
+        if (requestSchema.body) {
+          const contentTypeSafe = contentType.replace(/[^a-zA-Z0-9]/g, '');
+          getOrCreateSchemaReference(
+            requestSchema.body,
+            registry,
+            `${operationId}Request${contentTypeSafe}Body`
+          );
+        }
+      }
+    }
   }
 
   // Response body schemas only (headers, path params, and query params are inlined)
@@ -218,7 +237,7 @@ export const createOpenApiPaths = (
       paths[openApiPath] = {};
     }
     const pathItem = paths[openApiPath]!;
-    const method = (operation.method || 'GET').toLowerCase() as HttpMethod;
+    const method = operation.method.toLowerCase() as HttpMethod;
     pathItem[method] = createOpenApiOperation(operation, registry, operationId);
   }
   return paths;
@@ -305,22 +324,34 @@ function createOpenApiOperation(
     operationObj.parameters = parameters;
   }
 
-  // Request body
-  if (operation.request) {
-    const schemaId = getOrCreateSchemaReference(
-      operation.request,
-      registry,
-      `${operationId}Request`
-    );
-    if (schemaId) {
+  // Request body - only supports content-type map format
+  if (operation.requests) {
+    const requestByContentType = operation.requests as RequestByContentType;
+    const content: Record<string, OpenAPIV3_1.MediaTypeObject> = {};
+
+    for (const [contentType, requestSchema] of Object.entries(requestByContentType)) {
+      if (requestSchema && typeof requestSchema === 'object' && 'body' in requestSchema) {
+        if (requestSchema.body) {
+          const contentTypeSafe = contentType.replace(/[^a-zA-Z0-9]/g, '');
+          const bodySchemaId = getOrCreateSchemaReference(
+            requestSchema.body,
+            registry,
+            `${operationId}Request${contentTypeSafe}Body`
+          );
+          if (bodySchemaId) {
+            content[contentType] = {
+              schema: {
+                $ref: `#/components/schemas/${bodySchemaId}`,
+              },
+            };
+          }
+        }
+      }
+    }
+
+    if (Object.keys(content).length > 0) {
       operationObj.requestBody = {
-        content: {
-          'application/json': {
-            schema: {
-              $ref: `#/components/schemas/${schemaId}`,
-            },
-          },
-        },
+        content,
       };
     }
   }

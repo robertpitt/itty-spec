@@ -44,12 +44,12 @@ export function createBasicResponseHelpers() {
       const { status, contentType, body, headers } = options;
       const responseHeaders = headers ? new Headers(headers) : new Headers();
 
-      // Set Content-Type header if not already set
-      if (!responseHeaders.has('Content-Type')) {
+      // Set content-type header if not already set
+      if (!responseHeaders.has('content-type')) {
         if (contentType === 'text/html') {
-          responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
+          responseHeaders.set('content-type', 'text/html; charset=utf-8');
         } else {
-          responseHeaders.set('Content-Type', contentType);
+          responseHeaders.set('content-type', contentType);
         }
       }
 
@@ -78,19 +78,19 @@ export function createResponseHelpers<TOperation extends ContractOperation>(
       const { status, contentType, body, headers } = options;
       const responseHeaders = headers ? new Headers(headers as HeadersInit) : new Headers();
 
-      // Set Content-Type header if not already set
-      if (!responseHeaders.has('Content-Type')) {
+      // Set content-type header if not already set
+      if (!responseHeaders.has('content-type')) {
         // Handle special case for HTML
         if (contentType === 'text/html') {
-          responseHeaders.set('Content-Type', 'text/html; charset=utf-8');
+          responseHeaders.set('content-type', 'text/html; charset=utf-8');
         } else {
-          responseHeaders.set('Content-Type', contentType);
+          responseHeaders.set('content-type', contentType);
         }
       }
 
-      // Only include headers if they were provided or if Content-Type was set
+      // Only include headers if they were provided or if content-type was set
       const finalHeaders =
-        headers || responseHeaders.has('Content-Type') ? responseHeaders : undefined;
+        headers || responseHeaders.has('content-type') ? responseHeaders : undefined;
 
       return createResponse(status, body, finalHeaders) as ResponseVariant<
         TOperation,

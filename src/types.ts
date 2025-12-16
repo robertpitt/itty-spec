@@ -1,6 +1,32 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { IRequest, RequestHandler, ResponseHandler } from 'itty-router';
 
+// ============================================================================
+// Type System Overview
+// ============================================================================
+//
+// This file defines the type system for contract-based routing. The architecture
+// follows a layered approach:
+//
+// 1. **Base Types**: Fundamental types (EmptyObject, RawQuery, etc.)
+// 2. **Schema Maps**:
+//    - RequestByContentType: content-type → request schema
+//    - ResponseByContentType: content-type → response schema
+//    - ResponseByStatusCode: status-code → ResponseByContentType (explicit numeric codes only)
+// 3. **Reusable Helpers**: Generic utilities for schema inference and extraction
+// 4. **Operation Types**: ContractOperation definition and its parameter extractors
+// 5. **Router Types**: Request/response types for handlers and middleware
+//
+// Key design principles:
+// - Reusable helpers eliminate duplication (e.g., InferOptionalSchema, ExtractBodyFromResponseMap)
+// - Optional schemas use consistent fallback patterns
+// - Content-type maps enable multiple representations (JSON, HTML, XML, etc.)
+// - Type inference preserves literal types for path parameter extraction
+
+// ============================================================================
+// Base Types
+// ============================================================================
+
 /**
  * Canonical "empty object" type for "no params"
  */
@@ -30,33 +56,66 @@ export type ResponseSchema<
 };
 
 /**
- * Response schemas mapped by content type
- * Allows different schemas for different content types (e.g., JSON, HTML, XML)
+ * Response schemas mapped by content type.
+ * Allows different schemas for different content types (e.g., JSON, HTML, XML).
+ *
+ * Example:
+ * ```typescript
+ * {
+ *   'application/json': { body: z.object({ result: z.number() }) },
+ *   'text/html': { body: z.string() }
+ * }
+ * ```
  */
 export type ResponseByContentType = {
   [contentType: string]: ResponseSchema;
 };
 
 /**
- * Response schemas mapped by status code.
+ * Request schemas mapped by content type.
+ * Allows different schemas for different content types (e.g., JSON, XML, form-data).
  *
- * Each status code must use a content-type map format:
- * `{ 'application/json': { body: Schema }, 'text/html': { body: Schema } }`
- *
- * Validates that:
- * - If 200 is present, default is optional
- * - If 200 is not present, default is required (to encourage explicit status codes)
- *
- * Uses Partial<Record<number, ...>> instead of Record<number, ...> to preserve
- * literal key types, allowing the `200 extends keyof T` check to work correctly.
+ * Example:
+ * ```typescript
+ * {
+ *   'application/json': { body: z.object({ name: z.string() }) },
+ *   'application/xml': { body: z.string() }
+ * }
+ * ```
  */
-type ResponseMap = Partial<Record<number, ResponseByContentType>> & {
-  default?: ResponseByContentType;
+export type RequestByContentType = {
+  [contentType: string]: { body: StandardSchemaV1 };
 };
 
-export type ResponseSchemas<T extends ResponseMap> = 200 extends keyof T
-  ? T & Partial<Record<'default', ResponseByContentType>>
-  : T & Required<Pick<T, 'default'>>;
+/**
+ * Request schemas type - only supports content-type map format.
+ * This type ensures requests are always in the content-type map format.
+ */
+export type RequestSchemas<T extends RequestByContentType | undefined> = T extends undefined
+  ? undefined
+  : T;
+
+/**
+ * Response schemas mapped by status code.
+ * Each status code maps to a ResponseByContentType (content-type → response schema).
+ *
+ * Example:
+ * ```typescript
+ * {
+ *   200: {
+ *     'application/json': { body: z.object({ result: z.number() }) },
+ *     'text/html': { body: z.string() }
+ *   },
+ *   400: {
+ *     'application/json': { body: z.object({ error: z.string() }) }
+ *   }
+ * }
+ * ```
+ *
+ * Uses Partial<Record<number, ...>> instead of Record<number, ...> to preserve
+ * literal key types for better type inference.
+ */
+export type ResponseByStatusCode = Partial<Record<number, ResponseByContentType>>;
 
 /**
  * HTTP method types
@@ -70,14 +129,16 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 
  * which is necessary for ExtractPathParams to work correctly.
  *
  * - `operationId` is optional - if omitted, the contract key will be used as the default
- * - `method` is optional - if omitted, defaults to 'GET'
+ * - `method` is required - must be explicitly specified
+ * - `requests` must be a RequestByContentType map (content-type keyed object)
+ * - `responses` must explicitly define numeric status codes (no default responses)
  */
 export type ContractOperation<
   TPathParams extends StandardSchemaV1 | undefined = undefined,
   TQuery extends StandardSchemaV1 | undefined = undefined,
-  TRequest extends StandardSchemaV1 | undefined = undefined,
+  TRequests extends RequestByContentType | undefined = undefined,
   THeaders extends StandardSchemaV1 | undefined = undefined,
-  TResponses extends ResponseMap = ResponseMap,
+  TResponses extends ResponseByStatusCode = ResponseByStatusCode,
   TPath extends string = string,
 > = {
   operationId?: string;
@@ -86,13 +147,19 @@ export type ContractOperation<
   title?: string;
   tags?: string[];
   path: TPath;
-  method?: HttpMethod;
+  method: HttpMethod;
   pathParams?: TPathParams;
   query?: TQuery;
-  request?: TRequest;
+  requests?: RequestSchemas<TRequests>;
   headers?: THeaders;
-  responses: ResponseSchemas<TResponses>;
+  responses: TResponses;
 };
+
+/**
+ * Type constraint for any contract operation.
+ * Used as a constraint in helper types to accept any valid operation.
+ */
+type AnyContractOperation = ContractOperation<any, any, any, any, any, any>;
 
 /**
  * Contract definition - a record of operation IDs to operations
@@ -101,7 +168,7 @@ export type ContractOperation<
  * which is necessary for ExtractPathParams to work correctly.
  */
 export type ContractDefinition = {
-  [K in string]: ContractOperation<any, any, any, any, any, any>;
+  [K in string]: AnyContractOperation;
 };
 
 /**
@@ -161,108 +228,146 @@ type NormalizeEmpty<T> = keyof MergeIntersection<T> extends never
   ? EmptyObject
   : MergeIntersection<T>;
 
-/**
- * Extract path params type from a contract operation
- * Uses explicit pathParams schema if provided, otherwise extracts from path string
- *
- * IMPORTANT: because `pathParams` is optional, we must check if it exists
- * before trying to infer its output type.
- * With the updated defaults, omitted properties are `undefined`, so we check for `undefined` explicitly.
- */
-export type ContractOperationParameters<O extends ContractOperation<any, any, any, any, any, any>> =
-  O['pathParams'] extends undefined
-    ? NormalizeEmpty<ExtractPathParams<O['path']>>
-    : O['pathParams'] extends StandardSchemaV1
-      ? StandardSchemaV1.InferOutput<O['pathParams']>
-      : NormalizeEmpty<ExtractPathParams<O['path']>>;
+// ============================================================================
+// Reusable Schema Inference Helpers
+// ============================================================================
 
 /**
- * Extract query params type from a contract operation
- *
- * IMPORTANT: because `query` is optional, we must check if it exists
- * before trying to infer its output type.
- * With the updated defaults, omitted properties are `undefined`, so we check for `undefined` explicitly.
+ * Infer output type from an optional schema, falling back to a default type.
+ * Handles the common pattern of checking for undefined before inferring schema output.
  */
-export type ContractOperationQuery<O extends ContractOperation<any, any, any, any, any, any>> =
-  O['query'] extends undefined
-    ? RawQuery
-    : O['query'] extends StandardSchemaV1
-      ? StandardSchemaV1.InferOutput<O['query']>
-      : RawQuery;
+type InferOptionalSchema<
+  TSchema extends StandardSchemaV1 | undefined,
+  TDefault,
+> = TSchema extends undefined
+  ? TDefault
+  : TSchema extends StandardSchemaV1
+    ? StandardSchemaV1.InferOutput<TSchema>
+    : TDefault;
 
 /**
- * Extract body type from a contract operation
- *
- * IMPORTANT: because `request` is optional, we must check if it exists
- * before trying to infer its output type.
- * With the updated defaults, omitted properties are `undefined`, so we check for `undefined` explicitly.
+ * Extract body type from a request content-type map.
+ * Returns a union of all body types across all content types.
  */
-export type ContractOperationBody<O extends ContractOperation<any, any, any, any, any, any>> =
-  O['request'] extends undefined
-    ? undefined
-    : O['request'] extends StandardSchemaV1
-      ? StandardSchemaV1.InferOutput<O['request']>
-      : undefined;
+type ExtractBodyFromRequestMap<T extends RequestByContentType> = {
+  [K in keyof T]: T[K] extends { body: infer TBody }
+    ? TBody extends StandardSchemaV1
+      ? StandardSchemaV1.InferOutput<TBody>
+      : never
+    : never;
+}[keyof T];
 
 /**
- * Extract headers type from a contract operation
- *
- * IMPORTANT: because `headers` is optional, we must check if it exists
- * before trying to infer its output type.
- * With the updated defaults, omitted properties are `undefined`, so we check for `undefined` explicitly.
+ * Extract body type from a response content-type map.
+ * Returns a union of all body types across all content types.
  */
-export type ContractOperationHeaders<O extends ContractOperation<any, any, any, any, any, any>> =
-  O['headers'] extends undefined
-    ? NormalizedHeaders
-    : O['headers'] extends StandardSchemaV1
-      ? StandardSchemaV1.InferOutput<O['headers']>
-      : NormalizedHeaders;
+type ExtractBodyFromResponseMap<T extends ResponseByContentType> = {
+  [K in keyof T]: T[K] extends ResponseSchema<infer TBody>
+    ? StandardSchemaV1.InferOutput<TBody>
+    : never;
+}[keyof T];
+
+/**
+ * Extract headers type from a response content-type map.
+ * Returns a union of all header types across all content types.
+ */
+type ExtractHeadersFromResponseMap<T extends ResponseByContentType> = {
+  [K in keyof T]: T[K] extends ResponseSchema<any, infer THeaders>
+    ? THeaders extends StandardSchemaV1
+      ? StandardSchemaV1.InferOutput<THeaders>
+      : never
+    : never;
+}[keyof T];
+
+/**
+ * Extract body type from a single ResponseSchema.
+ */
+type ExtractBodyFromResponseSchema<T extends ResponseSchema> = StandardSchemaV1.InferOutput<
+  T['body']
+>;
+
+/**
+ * Extract headers type from a single ResponseSchema.
+ */
+type ExtractHeadersFromResponseSchema<T extends ResponseSchema> =
+  T['headers'] extends StandardSchemaV1 ? StandardSchemaV1.InferOutput<T['headers']> : never;
+
+// ============================================================================
+// Contract Operation Parameter Extractors
+// ============================================================================
+
+/**
+ * Extract path params type from a contract operation.
+ * Uses explicit pathParams schema if provided, otherwise extracts from path string.
+ */
+export type ContractOperationParameters<O extends AnyContractOperation> = InferOptionalSchema<
+  O['pathParams'],
+  NormalizeEmpty<ExtractPathParams<O['path']>>
+>;
+
+/**
+ * Extract query params type from a contract operation.
+ * Falls back to RawQuery when no schema is provided.
+ */
+export type ContractOperationQuery<O extends AnyContractOperation> = InferOptionalSchema<
+  O['query'],
+  RawQuery
+>;
+
+/**
+ * Extract body type from a contract operation.
+ * Only supports content-type map format.
+ * Returns undefined when no request schema is provided.
+ */
+export type ContractOperationBody<O extends AnyContractOperation> = O['requests'] extends undefined
+  ? undefined
+  : O['requests'] extends RequestByContentType
+    ? ExtractBodyFromRequestMap<O['requests']>
+    : undefined;
+
+/**
+ * Extract headers type from a contract operation.
+ * Falls back to NormalizedHeaders when no schema is provided.
+ */
+export type ContractOperationHeaders<O extends AnyContractOperation> = InferOptionalSchema<
+  O['headers'],
+  NormalizedHeaders
+>;
 
 // ============================================================================
 // Router Types
 // ============================================================================
 
 /**
- * Contract operation request type that extends IRequest with typed params, query, body, and headers
- * This aligns with itty-router's pattern where handlers receive a typed request
+ * Contract operation request type that extends IRequest with typed params, query, body, and headers.
+ * This aligns with itty-router's pattern where handlers receive a typed request.
  *
  * Note: We use `validatedBody`, `validatedHeaders`, and `validatedQuery` to avoid shadowing
  * IRequest's native `body` (ReadableStream) and `headers` (Headers object) properties.
  * The `params` property is kept as-is since it's standard in itty-router.
  */
-export type ContractOperationRequest<O extends ContractOperation<any, any, any, any, any, any>> =
-  IRequest & {
-    params: ContractOperationParameters<O>;
-    query: ContractOperationQuery<O>;
-    validatedQuery: ContractOperationQuery<O>;
-    validatedBody: ContractOperationBody<O>;
-    validatedHeaders: ContractOperationHeaders<O>;
-  };
+export type ContractOperationRequest<O extends AnyContractOperation> = IRequest & {
+  params: ContractOperationParameters<O>;
+  query: ContractOperationQuery<O>;
+  validatedQuery: ContractOperationQuery<O>;
+  validatedBody: ContractOperationBody<O>;
+  validatedHeaders: ContractOperationHeaders<O>;
+};
 
 /**
- * Extract body type from a response (content-type map)
+ * Extract body type from a response (content-type map).
+ * Uses the reusable ExtractBodyFromResponseMap helper.
  */
 type ExtractResponseBody<T> = T extends ResponseByContentType
-  ? // For content-type maps, extract union of all body types
-    {
-      [K in keyof T]: T[K] extends ResponseSchema<infer TBody>
-        ? StandardSchemaV1.InferOutput<TBody>
-        : never;
-    }[keyof T]
+  ? ExtractBodyFromResponseMap<T>
   : never;
 
 /**
- * Extract headers type from a response (content-type map)
+ * Extract headers type from a response (content-type map).
+ * Uses the reusable ExtractHeadersFromResponseMap helper.
  */
 type ExtractResponseHeaders<T> = T extends ResponseByContentType
-  ? // For content-type maps, extract union of all header types
-    {
-      [K in keyof T]: T[K] extends ResponseSchema<any, infer THeaders>
-        ? THeaders extends StandardSchemaV1
-          ? StandardSchemaV1.InferOutput<THeaders>
-          : never
-        : never;
-    }[keyof T]
+  ? ExtractHeadersFromResponseMap<T>
   : never;
 
 /**
@@ -283,7 +388,8 @@ export type ContractOperationStatusCodes<O extends ContractOperation> = keyof O[
   number;
 
 /**
- * Extract body type for a specific status code and content type
+ * Extract body type for a specific status code and content type.
+ * Uses the reusable ExtractBodyFromResponseSchema helper.
  */
 export type ContractOperationResponseBody<
   O extends ContractOperation,
@@ -291,14 +397,15 @@ export type ContractOperationResponseBody<
   C extends string = 'application/json',
 > = O['responses'][S] extends ResponseByContentType
   ? C extends keyof O['responses'][S]
-    ? O['responses'][S][C] extends ResponseSchema<infer TBody>
-      ? StandardSchemaV1.InferOutput<TBody>
+    ? O['responses'][S][C] extends ResponseSchema
+      ? ExtractBodyFromResponseSchema<O['responses'][S][C]>
       : never
     : never
   : never;
 
 /**
- * Extract headers type for a specific status code and content type
+ * Extract headers type for a specific status code and content type.
+ * Uses the reusable ExtractHeadersFromResponseSchema helper.
  */
 export type ContractOperationResponseHeaders<
   O extends ContractOperation,
@@ -306,10 +413,8 @@ export type ContractOperationResponseHeaders<
   C extends string = 'application/json',
 > = O['responses'][S] extends ResponseByContentType
   ? C extends keyof O['responses'][S]
-    ? O['responses'][S][C] extends ResponseSchema<any, infer THeaders>
-      ? THeaders extends StandardSchemaV1
-        ? StandardSchemaV1.InferOutput<THeaders>
-        : never
+    ? O['responses'][S][C] extends ResponseSchema
+      ? ExtractHeadersFromResponseSchema<O['responses'][S][C]>
       : never
     : never
   : never;
@@ -351,7 +456,7 @@ export type RespondOptions<
 export type ContractOperationResponseHelpers<O extends ContractOperation> = {
   /**
    * Create a response with typed body, status code, and content type
-   * Validates that the status code and content type exist in the contract
+   * TypeScript ensures the status code and content type exist in the contract
    * and body/headers match the schemas
    */
   respond<S extends ContractOperationStatusCodes<O>, C extends ExtractContentTypes<O, S>>(

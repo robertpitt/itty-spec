@@ -31,7 +31,7 @@ import {
  * - Automatic route registration based on contract operations
  * - Type-safe request/response handling
  * - Automatic validation of path params, query params, headers, and body
- * - Type-safe response helpers (json, error, noContent)
+ * - Type-safe response helpers (respond)
  *
  * @typeParam TContract - The contract definition type
  * @typeParam RequestType - The request type (extends IRequest)
@@ -54,7 +54,11 @@ import {
  *   contract: myContract,
  *   handlers: {
  *     getUsers: async (request) => {
- *       return request.json({ users: [] }, 200);
+ *       return request.respond({
+ *         status: 200,
+ *         contentType: 'application/json',
+ *         body: { users: [] },
+ *       });
  *     },
  *   },
  * });
@@ -129,10 +133,18 @@ export const createRouter = <
   for (const [contractKey, operation] of Object.entries(options.contract)) {
     const handler = options.handlers[contractKey as keyof TContract];
     if (!handler) continue;
+
+    // Validate that method is explicitly provided
+    if (!operation.method) {
+      throw new Error(
+        `Contract operation "${contractKey}" must explicitly specify a method. ` +
+          `Found: undefined. Please add method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS'`
+      );
+    }
+
     const operationWithDefaults = {
       ...operation,
       operationId: operation.operationId ?? contractKey,
-      method: operation.method ?? 'GET',
     };
     const method = operationWithDefaults.method.toLowerCase() as Lowercase<HttpMethod>;
     router[method]<IRequest, Args>(operation.path, async (request: IRequest, ...args: Args) =>

@@ -91,10 +91,14 @@ test('POST request with body should handle validated body', async () => {
       operationId: 'postCalculate',
       path: '/calculate',
       method: 'POST',
-      request: z.object({
-        a: z.number().min(0).max(100),
-        b: z.number().min(0).max(100),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            a: z.number().min(0).max(100),
+            b: z.number().min(0).max(100),
+          }),
+        },
+      },
       responses: {
         200: { 'application/json': { body: z.object({ result: z.number() }) } },
         400: { 'application/json': { body: z.object({ error: z.string() }) } },
@@ -120,7 +124,7 @@ test('POST request with body should handle validated body', async () => {
 
   const request = new Request('http://localhost:3000/calculate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ a: 10, b: 20 }),
   });
   const response = await router.fetch(request);
@@ -136,10 +140,14 @@ test('POST request with body should return 400 for invalid body', async () => {
       operationId: 'postCalculate',
       path: '/calculate',
       method: 'POST',
-      request: z.object({
-        a: z.number().min(0).max(100),
-        b: z.number().min(0).max(100),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            a: z.number().min(0).max(100),
+            b: z.number().min(0).max(100),
+          }),
+        },
+      },
       responses: {
         200: { 'application/json': { body: z.object({ result: z.number() }) } },
         400: { 'application/json': { body: z.object({ error: z.string() }) } },
@@ -165,7 +173,7 @@ test('POST request with body should return 400 for invalid body', async () => {
 
   const request = new Request('http://localhost:3000/calculate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ a: 50, b: 60 }),
   });
   const response = await router.fetch(request);
@@ -351,10 +359,14 @@ test('Error handling should handle validation errors gracefully', async () => {
       operationId: 'postUser',
       path: '/users',
       method: 'POST',
-      request: z.object({
-        name: z.string().min(1),
-        email: z.email(),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().min(1),
+            email: z.email(),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
         400: { 'application/json': { body: z.object({ error: z.string() }) } },
@@ -378,7 +390,7 @@ test('Error handling should handle validation errors gracefully', async () => {
   // Invalid email should trigger validation error
   const request = new Request('http://localhost:3000/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'John', email: 'invalid-email' }),
   });
   const response = await router.fetch(request);
@@ -485,11 +497,15 @@ test('Body validation should return 400 with error details for missing required 
     createUser: {
       path: '/users',
       method: 'POST',
-      request: z.object({
-        name: z.string().min(1),
-        email: z.string().email(),
-        age: z.number().min(18),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().min(1),
+            email: z.string().email(),
+            age: z.number().min(18),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
         400: {
@@ -515,7 +531,7 @@ test('Body validation should return 400 with error details for missing required 
   // Missing required fields
   const request = new Request('http://localhost:3000/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'John' }),
   });
   const response = await router.fetch(request);
@@ -532,10 +548,14 @@ test('Body validation should return 400 for invalid email format', async () => {
     createUser: {
       path: '/users',
       method: 'POST',
-      request: z.object({
-        name: z.string().min(1),
-        email: z.string().email(),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().min(1),
+            email: z.string().email(),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
         400: {
@@ -561,7 +581,7 @@ test('Body validation should return 400 for invalid email format', async () => {
   // Invalid email format
   const request = new Request('http://localhost:3000/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'John', email: 'not-an-email' }),
   });
   const response = await router.fetch(request);
@@ -577,10 +597,14 @@ test('Body validation should return 400 for value below minimum constraint', asy
     createUser: {
       path: '/users',
       method: 'POST',
-      request: z.object({
-        name: z.string().min(1),
-        age: z.number().min(18).max(120),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().min(1),
+            age: z.number().min(18).max(120),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
         400: {
@@ -606,7 +630,7 @@ test('Body validation should return 400 for value below minimum constraint', asy
   // Age below minimum
   const request = new Request('http://localhost:3000/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'John', age: 15 }),
   });
   const response = await router.fetch(request);
@@ -622,11 +646,15 @@ test('Body validation should return 400 for value above maximum constraint', asy
     createProduct: {
       path: '/products',
       method: 'POST',
-      request: z.object({
-        name: z.string().min(1),
-        price: z.number().min(0).max(10000),
-        quantity: z.number().int().min(0).max(1000),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().min(1),
+            price: z.number().min(0).max(10000),
+            quantity: z.number().int().min(0).max(1000),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
         400: {
@@ -652,7 +680,7 @@ test('Body validation should return 400 for value above maximum constraint', asy
   // Price above maximum
   const request = new Request('http://localhost:3000/products', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'Product', price: 50000, quantity: 10 }),
   });
   const response = await router.fetch(request);
@@ -668,18 +696,22 @@ test('Body validation should return 400 for invalid nested object structure', as
     createOrder: {
       path: '/orders',
       method: 'POST',
-      request: z.object({
-        customer: z.object({
-          name: z.string().min(1),
-          email: z.string().email(),
-        }),
-        items: z.array(
-          z.object({
-            productId: z.string(),
-            quantity: z.number().min(1),
-          })
-        ),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            customer: z.object({
+              name: z.string().min(1),
+              email: z.string().email(),
+            }),
+            items: z.array(
+              z.object({
+                productId: z.string(),
+                quantity: z.number().min(1),
+              })
+            ),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ orderId: z.string() }) } },
         400: {
@@ -705,7 +737,7 @@ test('Body validation should return 400 for invalid nested object structure', as
   // Invalid nested structure - customer email is invalid
   const request = new Request('http://localhost:3000/orders', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       customer: {
         name: 'John Doe',
@@ -727,14 +759,18 @@ test('Body validation should return 400 for invalid array item', async () => {
     createOrder: {
       path: '/orders',
       method: 'POST',
-      request: z.object({
-        items: z.array(
-          z.object({
-            productId: z.string().min(1),
-            quantity: z.number().min(1),
-          })
-        ),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            items: z.array(
+              z.object({
+                productId: z.string().min(1),
+                quantity: z.number().min(1),
+              })
+            ),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ orderId: z.string() }) } },
         400: {
@@ -760,7 +796,7 @@ test('Body validation should return 400 for invalid array item', async () => {
   // Invalid array item - quantity below minimum
   const request = new Request('http://localhost:3000/orders', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       items: [
         { productId: 'prod-1', quantity: 2 },
@@ -781,10 +817,14 @@ test('Body validation should return 400 for invalid JSON body', async () => {
     createUser: {
       path: '/users',
       method: 'POST',
-      request: z.object({
-        name: z.string().min(1),
-        email: z.string().email(),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().min(1),
+            email: z.string().email(),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
         400: {
@@ -810,7 +850,7 @@ test('Body validation should return 400 for invalid JSON body', async () => {
   // Invalid JSON
   const request = new Request('http://localhost:3000/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: '{ invalid json }',
   });
   const response = await router.fetch(request);
@@ -824,10 +864,14 @@ test('Body validation should return 400 for empty body when body is required', a
     createUser: {
       path: '/users',
       method: 'POST',
-      request: z.object({
-        name: z.string().min(1),
-        email: z.string().email(),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().min(1),
+            email: z.string().email(),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
         400: {
@@ -853,7 +897,7 @@ test('Body validation should return 400 for empty body when body is required', a
   // Empty body
   const request = new Request('http://localhost:3000/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({}),
   });
   const response = await router.fetch(request);
@@ -954,12 +998,16 @@ test('Multiple validation errors should return all error details', async () => {
     createUser: {
       path: '/users',
       method: 'POST',
-      request: z.object({
-        name: z.string().min(3),
-        email: z.string().email(),
-        age: z.number().min(18).max(120),
-        password: z.string().min(8),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().min(3),
+            email: z.string().email(),
+            age: z.number().min(18).max(120),
+            password: z.string().min(8),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
         400: {
@@ -985,7 +1033,7 @@ test('Multiple validation errors should return all error details', async () => {
   // Multiple validation errors: name too short, invalid email, age too low, password too short
   const request = new Request('http://localhost:3000/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       name: 'Jo', // Too short
       email: 'invalid-email', // Invalid format
@@ -1050,10 +1098,14 @@ test('Body validation should return 400 for invalid URL format', async () => {
     createLink: {
       path: '/links',
       method: 'POST',
-      request: z.object({
-        title: z.string().min(1),
-        url: z.string().url(),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            title: z.string().min(1),
+            url: z.string().url(),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), title: z.string() }) } },
         400: {
@@ -1079,7 +1131,7 @@ test('Body validation should return 400 for invalid URL format', async () => {
   // Invalid URL format
   const request = new Request('http://localhost:3000/links', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       title: 'My Link',
       url: 'not-a-valid-url',
@@ -1098,10 +1150,14 @@ test('Body validation should return 400 for invalid UUID format', async () => {
     getUser: {
       path: '/users/:id',
       method: 'PUT',
-      request: z.object({
-        name: z.string().min(1),
-        referenceId: z.string().uuid(),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().min(1),
+            referenceId: z.string().uuid(),
+          }),
+        },
+      },
       responses: {
         200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
         400: {
@@ -1127,7 +1183,7 @@ test('Body validation should return 400 for invalid UUID format', async () => {
   // Invalid UUID format
   const request = new Request('http://localhost:3000/users/123', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       name: 'John Doe',
       referenceId: 'not-a-uuid',
@@ -1141,15 +1197,19 @@ test('Body validation should return 400 for invalid UUID format', async () => {
   expect(body.details).toBeDefined();
 });
 
-test('Validation error response should have correct Content-Type header', async () => {
+test('Validation error response should have correct content-type header', async () => {
   const contract = createContract({
     createUser: {
       path: '/users',
       method: 'POST',
-      request: z.object({
-        name: z.string().min(1),
-        email: z.string().email(),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().min(1),
+            email: z.string().email(),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
         400: {
@@ -1175,13 +1235,13 @@ test('Validation error response should have correct Content-Type header', async 
   // Invalid email should trigger validation error
   const request = new Request('http://localhost:3000/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'John', email: 'invalid-email' }),
   });
   const response = await router.fetch(request);
 
   expect(response.status).toBe(400);
-  expect(response.headers.get('Content-Type')).toBe('application/json');
+  expect(response.headers.get('content-type')).toBe('application/json');
   const body = await response.json();
   expect(body.error).toBe('Validation failed');
   expect(body.details).toBeDefined();
@@ -1209,7 +1269,11 @@ test('Multiple operations should handle multiple operations in same router', asy
       operationId: 'createUser',
       path: '/users',
       method: 'POST',
-      request: z.object({ name: z.string() }),
+      requests: {
+        'application/json': {
+          body: z.object({ name: z.string() }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
       },
@@ -1259,7 +1323,7 @@ test('Multiple operations should handle multiple operations in same router', asy
   // Test POST /users
   const createRequest = new Request('http://localhost:3000/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'Jane' }),
   });
   const createResponse = await router.fetch(createRequest);
@@ -1273,7 +1337,7 @@ test('Optional operationId should default to contract key', async () => {
     getUserProfile: {
       // operationId omitted - should default to 'getUserProfile'
       path: '/users/:id/profile',
-      // method omitted - should default to 'GET'
+      method: 'GET', // method is now required
       responses: {
         200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
       },
@@ -1301,12 +1365,12 @@ test('Optional operationId should default to contract key', async () => {
   expect(body).toEqual({ id: '123', name: 'John Doe' });
 });
 
-test('Optional method should default to GET', async () => {
+test('Method is required and must be explicitly specified', async () => {
   const contract = createContract({
     listItems: {
       operationId: 'listItems',
       path: '/items',
-      // method omitted - should default to 'GET'
+      method: 'GET', // method is now required
       responses: {
         200: { 'application/json': { body: z.object({ items: z.array(z.string()) }) } },
       },
@@ -1338,6 +1402,7 @@ test('Explicit operationId should override contract key', async () => {
   const contract = createContract({
     getUserProfile: {
       operationId: 'customOperationId', // Explicit operationId should override key
+      method: 'GET', // method is now required
       path: '/users/:id/profile',
       responses: {
         200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
@@ -1372,7 +1437,11 @@ test('Explicit method should override default GET', async () => {
       operationId: 'createItem',
       path: '/items',
       method: 'POST', // Explicit method
-      request: z.object({ name: z.string() }),
+      requests: {
+        'application/json': {
+          body: z.object({ name: z.string() }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
       },
@@ -1394,7 +1463,7 @@ test('Explicit method should override default GET', async () => {
 
   const request = new Request('http://localhost:3000/items', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'New Item' }),
   });
   const response = await router.fetch(request);
@@ -1500,10 +1569,14 @@ test('PUT request should handle update operations', async () => {
     updateUser: {
       path: '/users/:id',
       method: 'PUT',
-      request: z.object({
-        name: z.string().min(1),
-        email: z.email(),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().min(1),
+            email: z.email(),
+          }),
+        },
+      },
       responses: {
         200: {
           'application/json': {
@@ -1534,7 +1607,7 @@ test('PUT request should handle update operations', async () => {
 
   const request = new Request('http://localhost:3000/users/123', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'Updated Name', email: 'updated@example.com' }),
   });
   const response = await router.fetch(request);
@@ -1553,10 +1626,14 @@ test('PATCH request should handle partial updates', async () => {
     patchUser: {
       path: '/users/:id',
       method: 'PATCH',
-      request: z.object({
-        name: z.string().optional(),
-        email: z.email().optional(),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            name: z.string().optional(),
+            email: z.email().optional(),
+          }),
+        },
+      },
       responses: {
         200: {
           'application/json': {
@@ -1590,7 +1667,7 @@ test('PATCH request should handle partial updates', async () => {
 
   const request = new Request('http://localhost:3000/users/123', {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'Partial Update' }),
   });
   const response = await router.fetch(request);
@@ -1752,8 +1829,8 @@ test('Finally middleware should run after handlers', async () => {
     contract,
     finally: [
       async (response) => {
-        responseHeaders.push('X-Custom-Header');
-        response.headers.set('X-Custom-Header', 'custom-value');
+        responseHeaders.push('x-custom-header');
+        response.headers.set('x-custom-header', 'custom-value');
         return response;
       },
     ],
@@ -1772,7 +1849,7 @@ test('Finally middleware should run after handlers', async () => {
   const response = await router.fetch(request);
 
   expect(response.status).toBe(200);
-  expect(response.headers.get('X-Custom-Header')).toBe('custom-value');
+  expect(response.headers.get('x-custom-header')).toBe('custom-value');
 });
 
 test('Route precedence should match specific routes before general ones', async () => {
@@ -1937,20 +2014,24 @@ test('Complex nested body should handle nested objects and arrays', async () => 
     createOrder: {
       path: '/orders',
       method: 'POST',
-      request: z.object({
-        customer: z.object({
-          name: z.string(),
-          email: z.email(),
-        }),
-        items: z.array(
-          z.object({
-            productId: z.string(),
-            quantity: z.number().min(1),
-            price: z.number(),
-          })
-        ),
-        metadata: z.record(z.string(), z.unknown()).optional(),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            customer: z.object({
+              name: z.string(),
+              email: z.email(),
+            }),
+            items: z.array(
+              z.object({
+                productId: z.string(),
+                quantity: z.number().min(1),
+                price: z.number(),
+              })
+            ),
+            metadata: z.record(z.string(), z.unknown()).optional(),
+          }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ orderId: z.string(), total: z.number() }) } },
       },
@@ -1989,7 +2070,7 @@ test('Complex nested body should handle nested objects and arrays', async () => 
 
   const request = new Request('http://localhost:3000/orders', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify(requestBody),
   });
   const response = await router.fetch(request);
@@ -2106,8 +2187,8 @@ test('Response headers should be set correctly', async () => {
           'application/json': {
             body: z.object({ users: z.array(z.string()) }),
             headers: z.object({
-              'X-Total-Count': z.string().optional(),
-              'Cache-Control': z.string().optional(),
+              'x-total-count': z.string().optional(),
+              'cache-control': z.string().optional(),
             }),
           },
         },
@@ -2126,8 +2207,8 @@ test('Response headers should be set correctly', async () => {
           contentType: 'application/json',
           body: { users: ['user1'] },
           headers: {
-            'X-Total-Count': '1',
-            'Cache-Control': 'max-age=3600',
+            'x-total-count': '1',
+            'cache-control': 'max-age=3600',
           },
         });
       },
@@ -2138,8 +2219,8 @@ test('Response headers should be set correctly', async () => {
   const response = await router.fetch(request);
 
   expect(response.status).toBe(200);
-  expect(response.headers.get('X-Total-Count')).toBe('1');
-  expect(response.headers.get('Cache-Control')).toBe('max-age=3600');
+  expect(response.headers.get('x-total-count')).toBe('1');
+  expect(response.headers.get('cache-control')).toBe('max-age=3600');
 });
 
 test('Empty query parameters should handle optional params', async () => {
@@ -2198,10 +2279,14 @@ test('Empty body should handle optional body validation', async () => {
     updateSettings: {
       path: '/settings',
       method: 'PATCH',
-      request: z.object({
-        theme: z.string().optional(),
-        notifications: z.boolean().optional(),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            theme: z.string().optional(),
+            notifications: z.boolean().optional(),
+          }),
+        },
+      },
       responses: {
         200: { 'application/json': { body: z.object({ updated: z.boolean() }) } },
       },
@@ -2224,7 +2309,7 @@ test('Empty body should handle optional body validation', async () => {
   // Test with empty body (should still validate as all fields are optional)
   const request = new Request('http://localhost:3000/settings', {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({}),
   });
   const response = await router.fetch(request);
@@ -2246,7 +2331,11 @@ test('Same path different methods should handle route conflicts correctly', asyn
     createUser: {
       path: '/users',
       method: 'POST',
-      request: z.object({ name: z.string() }),
+      requests: {
+        'application/json': {
+          body: z.object({ name: z.string() }),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
       },
@@ -2254,7 +2343,11 @@ test('Same path different methods should handle route conflicts correctly', asyn
     updateUsers: {
       path: '/users',
       method: 'PUT',
-      request: z.object({ users: z.array(z.string()) }),
+      requests: {
+        'application/json': {
+          body: z.object({ users: z.array(z.string()) }),
+        },
+      },
       responses: {
         200: { 'application/json': { body: z.object({ updated: z.number() }) } },
       },
@@ -2306,7 +2399,7 @@ test('Same path different methods should handle route conflicts correctly', asyn
   // Test POST
   const postRequest = new Request('http://localhost:3000/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'New User' }),
   });
   const postResponse = await router.fetch(postRequest);
@@ -2315,7 +2408,7 @@ test('Same path different methods should handle route conflicts correctly', asyn
   // Test PUT
   const putRequest = new Request('http://localhost:3000/users', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ users: ['user1', 'user2'] }),
   });
   const putResponse = await router.fetch(putRequest);
@@ -2371,15 +2464,19 @@ test('Large payload should handle big request bodies', async () => {
     bulkCreate: {
       path: '/items/bulk',
       method: 'POST',
-      request: z.object({
-        items: z.array(
-          z.object({
-            name: z.string(),
-            description: z.string(),
-            tags: z.array(z.string()),
-          })
-        ),
-      }),
+      requests: {
+        'application/json': {
+          body: z.object({
+            items: z.array(
+              z.object({
+                name: z.string(),
+                description: z.string(),
+                tags: z.array(z.string()),
+              })
+            ),
+          }),
+        },
+      },
       responses: { 201: { 'application/json': { body: z.object({ created: z.number() }) } } },
     },
   });
@@ -2406,7 +2503,7 @@ test('Large payload should handle big request bodies', async () => {
 
   const request = new Request('http://localhost:3000/items/bulk', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ items }),
   });
   const response = await router.fetch(request);
@@ -2481,18 +2578,22 @@ test('Union types in body should handle discriminated unions', async () => {
     createEvent: {
       path: '/events',
       method: 'POST',
-      request: z.discriminatedUnion('type', [
-        z.object({
-          type: z.literal('user'),
-          userId: z.string(),
-          action: z.string(),
-        }),
-        z.object({
-          type: z.literal('system'),
-          systemId: z.string(),
-          event: z.string(),
-        }),
-      ]),
+      requests: {
+        'application/json': {
+          body: z.discriminatedUnion('type', [
+            z.object({
+              type: z.literal('user'),
+              userId: z.string(),
+              action: z.string(),
+            }),
+            z.object({
+              type: z.literal('system'),
+              systemId: z.string(),
+              event: z.string(),
+            }),
+          ]),
+        },
+      },
       responses: {
         201: { 'application/json': { body: z.object({ eventId: z.string(), type: z.string() }) } },
       },
@@ -2516,7 +2617,7 @@ test('Union types in body should handle discriminated unions', async () => {
   // Test user event
   const userRequest = new Request('http://localhost:3000/events', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ type: 'user', userId: 'user-123', action: 'login' }),
   });
   const userResponse = await router.fetch(userRequest);
@@ -2526,7 +2627,7 @@ test('Union types in body should handle discriminated unions', async () => {
   // Test system event
   const systemRequest = new Request('http://localhost:3000/events', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ type: 'system', systemId: 'sys-456', event: 'startup' }),
   });
   const systemResponse = await router.fetch(systemRequest);

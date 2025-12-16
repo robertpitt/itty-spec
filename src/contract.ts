@@ -16,7 +16,11 @@ import { ContractDefinition } from './types';
  *     operationId: 'getUsers',
  *     path: '/users/:id',  // Path params will be extracted correctly
  *     method: 'GET',
- *     responses: { 200: { body: z.object({ users: z.array(z.string()) }) } },
+ *     responses: {
+ *       200: {
+ *         'application/json': { body: z.object({ users: z.array(z.string()) }) },
+ *       },
+ *     },
  *   },
  * });
  * ```
@@ -39,7 +43,11 @@ import { ContractDefinition } from './types';
  *     operationId: 'getUsers',
  *     path: '/users/:id',
  *     method: 'GET',
- *     responses: { 200: { body: z.object({ users: z.array(z.string()) }) } },
+ *     responses: {
+ *       200: {
+ *         'application/json': { body: z.object({ users: z.array(z.string()) }) },
+ *       },
+ *     },
  *   },
  * });
  * ```

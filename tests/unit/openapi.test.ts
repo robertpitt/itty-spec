@@ -1,6 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { createContract } from '../../src/index.js';
 import { createOpenApiSpecification } from '../../src/openapi/index.js';
+import type { OpenAPIV3_1 } from '../../src/openapi/types.js';
 import { z } from 'zod/v4';
 
 describe('OpenAPI Specification Generation', () => {
@@ -8,6 +9,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getUsers: {
         path: '/users',
+        method: 'GET',
         responses: {
           200: { body: z.object({ users: z.array(z.string()) }) },
         },
@@ -30,6 +32,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getUser: {
         path: '/users/:id',
+        method: 'GET',
         responses: {
           200: { body: z.object({ id: z.string() }) },
         },
@@ -49,6 +52,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getUser: {
         path: '/users/:id',
+        method: 'GET',
         responses: {
           200: { body: z.object({ id: z.string() }) },
         },
@@ -76,6 +80,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getUser: {
         path: '/users/:id',
+        method: 'GET',
         pathParams: z.object({
           id: z.string().uuid().describe('User UUID'),
         }),
@@ -103,6 +108,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getUserPost: {
         path: '/users/:userId/posts/:postId',
+        method: 'GET',
         pathParams: z.object({
           userId: z.string().uuid(),
           // postId not in schema, should fallback to string
@@ -132,6 +138,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getUsers: {
         path: '/users',
+        method: 'GET',
         query: z.object({
           page: z.number().int().min(1).describe('Page number'),
           limit: z.number().int().min(1).max(100).optional(),
@@ -181,11 +188,15 @@ describe('OpenAPI Specification Generation', () => {
       createUser: {
         path: '/users',
         method: 'POST',
-        request: z.object({
-          name: z.string().min(1),
-          email: z.string().email(),
-          age: z.number().int().min(0).optional(),
-        }),
+        requests: {
+          'application/json': {
+            body: z.object({
+              name: z.string().min(1),
+              email: z.string().email(),
+              age: z.number().int().min(0).optional(),
+            }),
+          },
+        },
         responses: {
           201: { body: z.object({ id: z.string(), name: z.string() }) },
         },
@@ -211,6 +222,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getUsers: {
         path: '/users',
+        method: 'GET',
         headers: z.object({
           'X-API-Key': z.string().describe('API key for authentication'),
           'X-Request-ID': z.string().uuid().optional(),
@@ -250,6 +262,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getUser: {
         path: '/users/:id',
+        method: 'GET',
         responses: {
           200: {
             'application/json': {
@@ -301,10 +314,14 @@ describe('OpenAPI Specification Generation', () => {
       createUser: {
         path: '/users',
         method: 'POST',
-        request: z.object({
-          name: z.string(),
-          email: z.string().email(),
-        }),
+        requests: {
+          'application/json': {
+            body: z.object({
+              name: z.string(),
+              email: z.string().email(),
+            }),
+          },
+        },
         responses: {
           201: { body: z.object({ id: z.string(), name: z.string() }) },
         },
@@ -330,6 +347,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getUser: {
         path: '/users/:id',
+        method: 'GET',
         responses: {
           200: { body: userSchema },
         },
@@ -337,7 +355,11 @@ describe('OpenAPI Specification Generation', () => {
       updateUser: {
         path: '/users/:id',
         method: 'PUT',
-        request: userSchema,
+        requests: {
+          'application/json': {
+            body: userSchema,
+          },
+        },
         responses: {
           200: { body: userSchema },
         },
@@ -360,6 +382,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getUsers: {
         path: '/users',
+        method: 'GET',
         responses: {
           200: { body: z.object({ users: z.array(z.string()) }) },
         },
@@ -367,7 +390,11 @@ describe('OpenAPI Specification Generation', () => {
       createUser: {
         path: '/users',
         method: 'POST',
-        request: z.object({ name: z.string() }),
+        requests: {
+          'application/json': {
+            body: z.object({ name: z.string() }),
+          },
+        },
         responses: {
           201: { body: z.object({ id: z.string() }) },
         },
@@ -389,6 +416,7 @@ describe('OpenAPI Specification Generation', () => {
       getUser: {
         operationId: 'getUserById',
         path: '/users/:id',
+        method: 'GET',
         summary: 'Get a user by ID',
         description: 'Retrieves a single user by their unique identifier',
         tags: ['users'],
@@ -415,20 +443,24 @@ describe('OpenAPI Specification Generation', () => {
       createOrder: {
         path: '/orders',
         method: 'POST',
-        request: z.object({
-          items: z.array(
-            z.object({
-              productId: z.string(),
-              quantity: z.number().int().min(1),
-              price: z.number().positive(),
-            })
-          ),
-          shippingAddress: z.object({
-            street: z.string(),
-            city: z.string(),
-            zipCode: z.string(),
-          }),
-        }),
+        requests: {
+          'application/json': {
+            body: z.object({
+              items: z.array(
+                z.object({
+                  productId: z.string(),
+                  quantity: z.number().int().min(1),
+                  price: z.number().positive(),
+                })
+              ),
+              shippingAddress: z.object({
+                street: z.string(),
+                city: z.string(),
+                zipCode: z.string(),
+              }),
+            }),
+          },
+        },
         responses: {
           201: {
             body: z.object({
@@ -462,11 +494,15 @@ describe('OpenAPI Specification Generation', () => {
       updateUser: {
         path: '/users/:id',
         method: 'PATCH',
-        request: z.object({
-          name: z.string().optional(),
-          email: z.string().email().optional(),
-          age: z.number().int().optional(),
-        }),
+        requests: {
+          'application/json': {
+            body: z.object({
+              name: z.string().optional(),
+              email: z.string().email().optional(),
+              age: z.number().int().optional(),
+            }),
+          },
+        },
         responses: {
           200: { body: z.object({ id: z.string() }) },
         },
@@ -488,6 +524,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getData: {
         path: '/data',
+        method: 'GET',
         responses: {
           200: {
             'application/json': {
@@ -525,6 +562,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getData: {
         path: '/data',
+        method: 'GET',
         responses: {
           200: {
             'application/json': {
@@ -566,6 +604,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getData: {
         path: '/data',
+        method: 'GET',
         responses: {
           200: {
             'application/json': { body: jsonSchema },
@@ -592,6 +631,7 @@ describe('OpenAPI Specification Generation', () => {
     const contract = createContract({
       getData: {
         path: '/data',
+        method: 'GET',
         responses: {
           200: {
             'application/json': { body: z.object({ result: z.number() }) },
@@ -614,5 +654,104 @@ describe('OpenAPI Specification Generation', () => {
     const operation = spec.paths?.['/data']?.get;
     expect(operation?.responses?.['400']?.content?.['application/json']).toBeDefined();
     expect(operation?.responses?.['500']?.content?.['application/json']).toBeDefined();
+  });
+
+  test('should not include pattern when standard OpenAPI format is present', () => {
+    const contract = createContract({
+      createUser: {
+        path: '/users',
+        method: 'POST',
+        requests: {
+          'application/json': {
+            body: z.object({
+              email: z.string().email(),
+              uri: z.string().url(),
+              uuid: z.string().uuid(),
+              date: z.string().date(),
+            }),
+          },
+        },
+        responses: {
+          201: { body: z.object({ id: z.string() }) },
+        },
+      },
+    });
+
+    const spec = createOpenApiSpecification(contract, {
+      title: 'Test API',
+      version: '1.0.0',
+    });
+
+    // Get the schema reference
+    const operation = spec.paths?.['/users']?.post;
+    const schemaRef = operation?.requestBody?.content?.['application/json']?.schema?.$ref;
+    expect(schemaRef).toBeDefined();
+
+    // Extract schema ID from reference
+    const schemaId = schemaRef?.replace('#/components/schemas/', '');
+    expect(schemaId).toBeDefined();
+
+    // Get the actual schema
+    const schema = spec.components?.schemas?.[schemaId!];
+    expect(schema).toBeDefined();
+    expect(schema?.properties).toBeDefined();
+
+    // Check that email field has format but no pattern
+    const emailSchema = schema?.properties?.email as OpenAPIV3_1.SchemaObject;
+    expect(emailSchema?.format).toBe('email');
+    expect(emailSchema?.pattern).toBeUndefined();
+
+    // Check that uri field has format but no pattern
+    const uriSchema = schema?.properties?.uri as OpenAPIV3_1.SchemaObject;
+    expect(uriSchema?.format).toBe('uri');
+    expect(uriSchema?.pattern).toBeUndefined();
+
+    // Check that uuid field has format but no pattern
+    const uuidSchema = schema?.properties?.uuid as OpenAPIV3_1.SchemaObject;
+    expect(uuidSchema?.format).toBe('uuid');
+    expect(uuidSchema?.pattern).toBeUndefined();
+  });
+
+  test('should include pattern when format is not a standard OpenAPI format', () => {
+    const contract = createContract({
+      createUser: {
+        path: '/users',
+        method: 'POST',
+        requests: {
+          'application/json': {
+            body: z.object({
+              // Custom regex pattern without standard format
+              customField: z.string().regex(/^[A-Z]{3}-\d{4}$/),
+            }),
+          },
+        },
+        responses: {
+          201: { body: z.object({ id: z.string() }) },
+        },
+      },
+    });
+
+    const spec = createOpenApiSpecification(contract, {
+      title: 'Test API',
+      version: '1.0.0',
+    });
+
+    // Get the schema reference
+    const operation = spec.paths?.['/users']?.post;
+    const schemaRef = operation?.requestBody?.content?.['application/json']?.schema?.$ref;
+    expect(schemaRef).toBeDefined();
+
+    // Extract schema ID from reference
+    const schemaId = schemaRef?.replace('#/components/schemas/', '');
+    expect(schemaId).toBeDefined();
+
+    // Get the actual schema
+    const schema = spec.components?.schemas?.[schemaId!];
+    expect(schema).toBeDefined();
+    expect(schema?.properties).toBeDefined();
+
+    // Check that customField has pattern (since it doesn't have a standard format)
+    const customFieldSchema = schema?.properties?.customField as OpenAPIV3_1.SchemaObject;
+    expect(customFieldSchema?.pattern).toBeDefined();
   });
 });

@@ -1,5 +1,6 @@
 import type { IRequest, RequestHandler, ResponseHandler } from 'itty-router';
 import { error, json } from 'itty-router';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type {
   ContractOperation,
   ContractOperationParameters,
@@ -7,31 +8,32 @@ import type {
   ContractOperationBody,
   ContractOperationHeaders,
   ContractAugmentedRequest,
+  RequestByContentType,
 } from './types.js';
 import { createResponseHelpers, validateSchema, defineProp } from './utils.js';
 
-const COMMON_HEADER_CASES: Record<string, string> = {
-  authorization: 'Authorization',
-  'content-type': 'Content-Type',
-  'content-length': 'Content-Length',
-  accept: 'Accept',
-  'user-agent': 'User-Agent',
-};
-
 /**
- * Normalize headers to Record<string, string>
+ * Normalize headers to Record<string, string> with lowercase keys
  * @param headers - Headers object or plain object
- * @param preserveCase - Whether to preserve header case (default: true)
  */
-function normalizeHeaders(headers: unknown, preserveCase = true): Record<string, string> {
+function normalizeHeaders(headers: unknown): Record<string, string> {
   const result: Record<string, string> = {};
-  if (headers instanceof Headers) {
-    headers.forEach((value, key) => {
-      result[preserveCase ? COMMON_HEADER_CASES[key] || key : key] = value;
-    });
-  } else if (headers && typeof headers === 'object') {
+  if (!headers || typeof headers !== 'object') {
+    return result;
+  }
+
+  // Check if it's a Headers-like object (has entries() method)
+  // This handles both native Headers and PonyfillHeaders from @whatwg-node/server
+  if ('entries' in headers && typeof (headers as Headers).entries === 'function') {
+    // Use entries() for reliable iteration across different environments
+    // This ensures we capture all headers regardless of how they were set
+    for (const [key, value] of (headers as Headers).entries()) {
+      result[key.toLowerCase()] = value;
+    }
+  } else {
+    // Plain object - use Object.entries
     for (const [key, value] of Object.entries(headers)) {
-      result[preserveCase ? key : key.toLowerCase()] = String(value);
+      result[key.toLowerCase()] = String(value);
     }
   }
   return result;
@@ -100,12 +102,14 @@ export function withMatchingContractOperation<TContract extends Record<string, C
       return;
     }
 
-    const method = request.method.toUpperCase();
+    const method = request.method.toLowerCase();
     const pathname = new URL(request.url).pathname.slice(base?.length || 0);
 
     // Find matching operation by method and path pattern
     for (const operation of Object.values(contract)) {
-      const operationMethod = (operation.method || 'GET').toUpperCase();
+      // Method is required, so skip operations without it (should not happen in valid contracts)
+      if (!operation.method) continue;
+      const operationMethod = operation.method.toLowerCase();
       if (operationMethod === method && matchesPathPattern(operation.path, pathname)) {
         (request as ContractAugmentedRequest).__contractOperation = operation;
         return;
@@ -210,12 +214,47 @@ export function withHeaders<TOperation extends ContractOperation>(
   operation: TOperation
 ): RequestHandler<IRequest> {
   return async (request: IRequest) => {
-    const requestHeaders = normalizeHeaders(request.headers, !operation.headers);
+    const requestHeaders = normalizeHeaders(request.headers);
     const headers = operation.headers
       ? await validateSchema<Record<string, unknown>>(operation.headers, requestHeaders)
       : requestHeaders;
     defineProp(request, 'validatedHeaders', headers as ContractOperationHeaders<TOperation>);
   };
+}
+
+/**
+ * Get Content-Type header from request (lowercase)
+ */
+function getContentType(request: IRequest): string | null {
+  const contentType = request.headers.get('content-type');
+  if (!contentType) return null;
+  // Remove charset and other parameters (e.g., "application/json; charset=utf-8" -> "application/json")
+  return contentType.split(';')[0].trim().toLowerCase();
+}
+
+/**
+ * Parse body data based on content type
+ */
+function parseBodyByContentType(contentType: string | null, bodyText: string): unknown {
+  if (!contentType) {
+    // Default to JSON parsing if no content type
+    try {
+      return JSON.parse(bodyText);
+    } catch {
+      return bodyText;
+    }
+  }
+
+  const normalizedType = contentType.toLowerCase();
+  if (normalizedType.includes('json')) {
+    try {
+      return JSON.parse(bodyText);
+    } catch {
+      return bodyText;
+    }
+  }
+  // For other types (XML, HTML, plain text, etc.), return as string
+  return bodyText;
 }
 
 /**
@@ -236,36 +275,63 @@ export function withBody<TOperation extends ContractOperation>(
   operation: TOperation
 ): RequestHandler<IRequest> {
   return async (request: IRequest) => {
-    if (!operation.request) return;
+    if (!operation.requests) return;
+
     let bodyData: unknown = {};
     let bodyReadSuccessfully = false;
+    let bodyText = '';
+
     try {
-      const bodyText = await request.text();
+      bodyText = await request.text();
       bodyReadSuccessfully = true;
-      if (bodyText?.trim()) {
-        try {
-          bodyData = JSON.parse(bodyText);
-        } catch {
-          bodyData = bodyText;
-        }
-      }
     } catch {
       bodyData = {};
     }
-    const body = bodyReadSuccessfully
-      ? await validateSchema<ContractOperationBody<TOperation>>(operation.request, bodyData)
-      : (bodyData as ContractOperationBody<TOperation>);
-    defineProp(request, 'validatedBody', body);
+
+    if (bodyReadSuccessfully && bodyText.trim()) {
+      // requests must be a content-type map
+      const requestByContentType = operation.requests as RequestByContentType;
+      const contentType = getContentType(request);
+      if (!contentType) {
+        throw error(400, 'Content-Type header is required');
+      }
+
+      // Find matching schema (case-insensitive)
+      const matchingEntry = Object.entries(requestByContentType).find(([key]) => {
+        return key.toLowerCase() === contentType;
+      });
+
+      if (!matchingEntry) {
+        throw error(
+          400,
+          `Unsupported Content-Type: ${contentType}. Supported types: ${Object.keys(requestByContentType).join(', ')}`
+        );
+      }
+
+      const [, requestSchema] = matchingEntry;
+      if (!requestSchema || typeof requestSchema !== 'object' || !('body' in requestSchema)) {
+        throw error(500, 'Invalid request schema configuration');
+      }
+      bodyData = parseBodyByContentType(contentType, bodyText);
+      const body = await validateSchema<ContractOperationBody<TOperation>>(
+        (requestSchema as { body: StandardSchemaV1 }).body,
+        bodyData
+      );
+      defineProp(request, 'validatedBody', body);
+    } else {
+      // Empty body
+      defineProp(request, 'validatedBody', bodyData as ContractOperationBody<TOperation>);
+    }
   };
 }
 
 /**
  * Middleware factory: Attaches typed response helper methods to the request object
- * These helpers validate responses against the contract's response schemas
+ * These helpers provide type-safe response creation based on the contract's response schemas
  *
  * Execution order: This middleware runs last in the chain, after withBody. It attaches
- * response helper methods (json, error, noContent) to the request object that handlers
- * can use to create type-safe responses.
+ * response helper methods (respond) to the request object that handlers can use to create
+ * type-safe responses.
  *
  * @param operation - The contract operation to create response helpers for
  * @returns A middleware function that attaches response helpers to the request
@@ -324,7 +390,7 @@ export const withGlobalHeaders: RequestHandler<IRequest> = async (request: IRequ
   const operation = (request as ContractAugmentedRequest).__contractOperation;
   if (!operation) return;
 
-  const requestHeaders = normalizeHeaders(request.headers, !operation.headers);
+  const requestHeaders = normalizeHeaders(request.headers);
   const headers = operation.headers
     ? await validateSchema<Record<string, unknown>>(operation.headers, requestHeaders)
     : requestHeaders;
@@ -337,25 +403,50 @@ export const withGlobalHeaders: RequestHandler<IRequest> = async (request: IRequ
  */
 export const withGlobalBody: RequestHandler<IRequest> = async (request: IRequest) => {
   const operation = (request as ContractAugmentedRequest).__contractOperation;
-  if (!operation || !operation.request) return;
+  if (!operation || !operation.requests) return;
 
   let bodyData: unknown = {};
   let bodyReadSuccessfully = false;
+  let bodyText = '';
+
   try {
-    const bodyText = await request.text();
+    bodyText = await request.text();
     bodyReadSuccessfully = true;
-    if (bodyText?.trim()) {
-      try {
-        bodyData = JSON.parse(bodyText);
-      } catch {
-        bodyData = bodyText;
-      }
-    }
   } catch {
     bodyData = {};
   }
-  const body = bodyReadSuccessfully ? await validateSchema(operation.request, bodyData) : bodyData;
-  defineProp(request, 'validatedBody', body);
+
+  if (bodyReadSuccessfully && bodyText.trim()) {
+    // Check if request is a content-type map
+
+    const contentType = getContentType(request);
+    if (!contentType) {
+      throw error(400, 'Content-Type header is required');
+    }
+
+    // Find matching schema (case-insensitive)
+    const matchingEntry = Object.entries(operation.requests).find(([key]) => {
+      return key.toLowerCase() === contentType;
+    });
+
+    if (!matchingEntry) {
+      throw error(
+        400,
+        `Unsupported Content-Type: ${contentType}. Supported types: ${Object.keys(operation.requests).join(', ')}`
+      );
+    }
+
+    const [, requestSchema] = matchingEntry;
+    if (!requestSchema || typeof requestSchema !== 'object' || !('body' in requestSchema)) {
+      throw error(500, 'Invalid request schema configuration');
+    }
+    bodyData = parseBodyByContentType(contentType, bodyText);
+    const body = await validateSchema((requestSchema as { body: StandardSchemaV1 }).body, bodyData);
+    defineProp(request, 'validatedBody', body);
+  } else {
+    // Empty body
+    defineProp(request, 'validatedBody', bodyData);
+  }
 };
 
 /**
@@ -404,13 +495,13 @@ export function withContractFormat(customFormatter?: ResponseHandler): ResponseH
       };
       const responseHeaders = new Headers(headers);
 
-      // Set default Content-Type if not provided
-      if (!responseHeaders.has('Content-Type') && status !== 204) {
-        responseHeaders.set('Content-Type', 'application/json');
+      // Set default content-type if not provided
+      if (!responseHeaders.has('content-type') && status !== 204) {
+        responseHeaders.set('content-type', 'application/json');
       }
 
-      // Get Content-Type after potentially setting default
-      const contentType = responseHeaders.get('Content-Type') || '';
+      // Get content-type after potentially setting default
+      const contentType = responseHeaders.get('content-type') || '';
 
       // Serialize body appropriately based on content type
       let responseBody: BodyInit | null = null;
@@ -463,7 +554,7 @@ export function withContractErrorHandler<
           error: 'Validation failed',
           details: (err as Error & { issues: unknown }).issues,
         }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        { status: 400, headers: { 'content-type': 'application/json' } }
       );
     }
     return error(400, request);

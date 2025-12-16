@@ -19,7 +19,7 @@ test('createBasicResponseHelpers should create respond helper', () => {
   expect(response.body).toEqual({ message: 'test' });
   expect(response.headers).toBeDefined();
   const headers = response.headers as Headers;
-  expect(headers.get('Content-Type')).toBe('application/json');
+  expect(headers.get('content-type')).toBe('application/json');
 });
 
 test('createBasicResponseHelpers should create respond helper with headers', () => {
@@ -29,7 +29,7 @@ test('createBasicResponseHelpers should create respond helper with headers', () 
     contentType: 'application/json',
     body: { message: 'test' },
     headers: {
-      'X-Custom-Header': 'value',
+      'x-custom-header': 'value',
     },
   });
 
@@ -37,8 +37,8 @@ test('createBasicResponseHelpers should create respond helper with headers', () 
   expect(response.body).toEqual({ message: 'test' });
   expect(response.headers).toBeDefined();
   const headers = response.headers as Headers;
-  expect(headers.get('Content-Type')).toBe('application/json');
-  expect(headers.get('X-Custom-Header')).toBe('value');
+  expect(headers.get('content-type')).toBe('application/json');
+  expect(headers.get('x-custom-header')).toBe('value');
 });
 
 test('createBasicResponseHelpers should handle no content response', () => {
@@ -73,7 +73,7 @@ test('createResponseHelpers should create respond helper', () => {
   expect(response.body).toEqual({ message: 'test' });
   expect(response.headers).toBeDefined();
   const headers = response.headers as Headers;
-  expect(headers.get('Content-Type')).toBe('application/json');
+  expect(headers.get('content-type')).toBe('application/json');
 });
 
 test('createResponseHelpers should create respond helper with explicit status', () => {
@@ -98,7 +98,7 @@ test('createResponseHelpers should create respond helper with explicit status', 
   expect(response.body).toEqual({ id: 123 });
   expect(response.headers).toBeDefined();
   const headers = response.headers as Headers;
-  expect(headers.get('Content-Type')).toBe('application/json');
+  expect(headers.get('content-type')).toBe('application/json');
 });
 
 test('createResponseHelpers should create respond helper with headers', () => {
@@ -110,7 +110,7 @@ test('createResponseHelpers should create respond helper with headers', () => {
       200: {
         'application/json': {
           body: z.object({ message: z.string() }),
-          headers: z.object({ 'Content-Type': z.string() }),
+          headers: z.object({ 'content-type': z.string() }),
         },
       },
     },
@@ -121,14 +121,14 @@ test('createResponseHelpers should create respond helper with headers', () => {
     status: 200,
     contentType: 'application/json',
     body: { message: 'test' },
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
   });
 
   expect(response.status).toBe(200);
   expect(response.body).toEqual({ message: 'test' });
   expect(response.headers).toBeDefined();
   const headers = response.headers as Headers;
-  expect(headers.get('Content-Type')).toBe('application/json');
+  expect(headers.get('content-type')).toBe('application/json');
 });
 
 test('createResponseHelpers should handle no content response', () => {
@@ -173,7 +173,7 @@ test('createResponseHelpers should create error response', () => {
   expect(response.body).toEqual({ error: 'Bad request' });
   expect(response.headers).toBeDefined();
   const headers = response.headers as Headers;
-  expect(headers.get('Content-Type')).toBe('application/json');
+  expect(headers.get('content-type')).toBe('application/json');
 });
 
 test('createResponseHelpers should create error response with headers', () => {
@@ -207,7 +207,7 @@ test('createResponseHelpers should create error response with headers', () => {
   expect(response.headers).toBeDefined();
   const headers = response.headers as Headers;
   expect(headers.get('X-Error-Code')).toBe('VALIDATION_ERROR');
-  expect(headers.get('Content-Type')).toBe('application/json');
+  expect(headers.get('content-type')).toBe('application/json');
 });
 
 describe('Content type helpers', () => {
@@ -261,7 +261,7 @@ describe('Content-type-specific response helpers', () => {
     expect(jsonResponse.body).toEqual({ result: 42 });
     expect(jsonResponse.headers).toBeDefined();
     const jsonHeaders = jsonResponse.headers as Headers;
-    expect(jsonHeaders.get('Content-Type')).toBe('application/json');
+    expect(jsonHeaders.get('content-type')).toBe('application/json');
 
     const htmlResponse = helpers.respond({
       status: 200,
@@ -272,10 +272,10 @@ describe('Content-type-specific response helpers', () => {
     expect(htmlResponse.body).toBe('<div>Hello</div>');
     expect(htmlResponse.headers).toBeDefined();
     const htmlHeaders = htmlResponse.headers as Headers;
-    expect(htmlHeaders.get('Content-Type')).toBe('text/html; charset=utf-8');
+    expect(htmlHeaders.get('content-type')).toBe('text/html; charset=utf-8');
   });
 
-  test('createResponseHelpers should set Content-Type header correctly', () => {
+  test('createResponseHelpers should set content-type header correctly', () => {
     const operation: ContractOperation = {
       operationId: 'test',
       path: '/test',
@@ -294,6 +294,6 @@ describe('Content-type-specific response helpers', () => {
       body: '<xml></xml>',
     });
     const headers = response.headers as Headers;
-    expect(headers.get('Content-Type')).toBe('application/xml');
+    expect(headers.get('content-type')).toBe('application/xml');
   });
 });

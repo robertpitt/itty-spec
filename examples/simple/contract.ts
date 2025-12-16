@@ -96,41 +96,60 @@ const CalculateErrorXML = z.string().meta({
 });
 
 /**
+ * GetDocsResponse schema
+ */
+const GetDocsResponse = z
+  .string()
+  .meta({ title: 'OpenAPI Specification', description: 'The OpenAPI specification' })
+  .meta({
+    title: 'Get Docs Response',
+    description: 'The response from the get docs endpoint',
+  });
+
+/**
  * Example Hello World contract
  */
 export const contract = createContract({
   getCalculate: {
     path: '/calculate',
+    method: 'GET',
     summary: 'Calculate',
     description: 'Calculate the sum of two numbers',
     query: CalculateRequest,
+    headers: z.object({
+      'content-type': z.union([
+        z.literal('application/json'),
+        z.literal('text/html'),
+        z.literal('application/xml'),
+      ]),
+    }),
     responses: {
       200: {
         'application/json': {
           body: CalculateResponse,
-          headers: z.object({ 'Content-Type': z.literal('application/json') }),
+          headers: z.object({ 'content-type': z.literal('application/json') }),
         },
         'text/html': {
           body: CalculateResponseHTML,
-          headers: z.object({ 'Content-Type': z.literal('text/html') }),
+          headers: z.object({ 'content-type': z.literal('text/html') }),
         },
         'application/xml': {
           body: CalculateResponseXML,
-          headers: z.object({ 'Content-Type': z.literal('application/xml') }),
+          headers: z.object({ 'content-type': z.literal('application/xml') }),
         },
       },
       400: {
         'application/json': {
           body: CalculateError,
-          headers: z.object({ 'Content-Type': z.literal('application/json') }),
+          headers: z.object({ 'content-type': z.literal('application/json') }),
         },
         'text/html': {
           body: CalculateErrorHTML,
-          headers: z.object({ 'Content-Type': z.literal('text/html') }),
+          headers: z.object({ 'content-type': z.literal('text/html') }),
         },
         'application/xml': {
           body: CalculateErrorXML,
-          headers: z.object({ 'Content-Type': z.literal('application/xml') }),
+          headers: z.object({ 'content-type': z.literal('application/xml') }),
         },
       },
     },
@@ -142,13 +161,19 @@ export const contract = createContract({
     summary: 'Calculate',
     description: 'Calculate the sum of two numbers',
     headers: z.object({
-      'Content-Type': z.union([
-        z.literal('application/json'),
-        z.literal('text/html'),
-        z.literal('application/xml'),
-      ]),
+      'content-type': z.enum(['application/json', 'text/html', 'application/xml']),
+      accept: z.enum(['application/json', 'application/multipart-form-data']),
     }),
-    request: CalculatePostRequest,
+    requests: {
+      'application/json': { body: CalculatePostRequest },
+      'application/multipart-form-data': {
+        body: z.string().min(1).max(10000).meta({
+          title: 'Multipart Form Data',
+          description: 'The multipart form data',
+          example: `Content-Type: application/multipart-form-data\n\n--boundary\nContent-Disposition: form-data; name="a"\n\n10\n--boundary\nContent-Disposition: form-data; name="b"\n\n20\n--boundary--`,
+        }),
+      },
+    },
     responses: {
       200: {
         'application/json': { body: CalculateResponse },
@@ -163,20 +188,6 @@ export const contract = createContract({
     },
     tags: ['Calculate API'],
   },
-  azizGetMethod: {
-    path: '/aziz',
-    method: 'GET',
-    query: z.object({
-      name: z.string(),
-      age: z.number().min(0).max(100),
-      isStudent: z.boolean(),
-      hobbies: z.array(z.string()),
-    }),
-    responses: {
-      200: { 'application/json': { body: z.object({ message: z.string() }) } },
-    },
-    tags: ['Aziz'],
-  },
   getDocs: {
     path: '/docs',
     method: 'GET',
@@ -187,14 +198,8 @@ export const contract = createContract({
     responses: {
       200: {
         'text/html': {
-          body: z
-            .string()
-            .meta({ description: 'The HTML representation of the OpenAPI specification' }),
-          'application/json': {
-            body: z.object({
-              openapi: z.string(),
-            }),
-          },
+          body: GetDocsResponse,
+          headers: z.object({ 'content-type': z.literal('text/html') }),
         },
       },
     },
