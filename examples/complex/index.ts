@@ -70,14 +70,8 @@ const router = createRouter({
     updateOrderStatus: orderHandlers.updateOrderStatus,
     getUserOrders: orderHandlers.getUserOrders,
     getSpec: async (request) => {
-      return request.respond({
-        status: 200,
-        contentType: 'application/json',
-        body: openApiSpecification as any,
-      });
+      return request.respond({ status: 200, body: openApiSpecification });
     },
-
-    // Misc handlers
     getDocs: async (request) => {
       return request.respond({
         status: 200,
@@ -89,11 +83,7 @@ const router = createRouter({
       return request.respond({
         status: 200,
         contentType: 'application/json',
-        body: {
-          status: 'ok',
-          timestamp: new Date().toISOString(),
-          version: '1.0.0',
-        },
+        body: { status: 'ok', timestamp: new Date().toISOString(), version: '1.0.0' },
       });
     },
   },

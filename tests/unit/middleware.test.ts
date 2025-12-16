@@ -1,15 +1,12 @@
 import { test, expect, describe } from 'vitest';
 import type { IRequest } from 'itty-router';
 import {
-  withContractOperation,
-  withPathParams,
-  withQueryParams,
-  withHeaders,
-  withBody,
+  withMatchingContractOperation,
+  withSpecValidation,
   withResponseHelpers,
   withContractFormat,
   withContractErrorHandler,
-} from '../../src/middleware.js';
+} from '../../src/middleware';
 import type { ContractOperation } from '../../src/types.js';
 import { z } from 'zod/v4';
 
@@ -18,19 +15,21 @@ import { z } from 'zod/v4';
  * Since IRequest extends Request, we need to merge custom properties onto a real Request object
  * to satisfy TypeScript's type checking.
  */
-function createMockRequest(overrides: Partial<IRequest> = {}): IRequest {
+function createMockRequest(
+  overrides: Partial<Omit<IRequest, 'headers'> & { headers?: HeadersInit }> = {}
+): IRequest {
   const url = overrides.url || 'http://example.com/test';
-  const init: RequestInit = {};
+  const init: RequestInit = {
+    method: overrides.method || 'GET',
+  };
 
   // Handle headers - can be Headers object, plain object, or array of tuples
   if (overrides.headers) {
     if (overrides.headers instanceof Headers) {
       init.headers = overrides.headers;
-    } else if (Array.isArray(overrides.headers)) {
-      init.headers = new Headers(overrides.headers as Record<string, string>);
     } else {
-      // Plain object - convert to Headers
-      init.headers = new Headers(overrides.headers as Record<string, string>);
+      // Plain object or array - convert to Headers
+      init.headers = new Headers(overrides.headers);
     }
   }
 
@@ -50,7 +49,7 @@ function createMockRequest(overrides: Partial<IRequest> = {}): IRequest {
   return request;
 }
 
-test('withContractOperation should attach contract operation to request', () => {
+test('withMatchingContractOperation should attach contract operation to request', () => {
   const operation: ContractOperation = {
     operationId: 'test',
     path: '/test',
@@ -59,12 +58,12 @@ test('withContractOperation should attach contract operation to request', () => 
   };
 
   const request = createMockRequest({ url: 'http://example.com/test' });
-  withContractOperation(operation)(request);
+  withMatchingContractOperation({ test: operation })(request);
   expect((request as any).__contractOperation).toBe(operation);
 });
 
-describe('withPathParams', () => {
-  test('withPathParams should use params from request when no schema provided', async () => {
+describe('withSpecValidation - path params', () => {
+  test('should use params from request when no schema provided', async () => {
     const operation: ContractOperation = {
       operationId: 'test',
       path: '/users/:id',
@@ -73,14 +72,14 @@ describe('withPathParams', () => {
     };
 
     const request = new Request('http://example.com/users/123') as IRequest;
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
 
-    await withPathParams(request);
+    await withSpecValidation(request);
 
     expect((request as any).params).toEqual({ id: '123' });
   });
 
-  test('withPathParams should handle empty params', async () => {
+  test('should handle empty params', async () => {
     const operation: ContractOperation = {
       operationId: 'test',
       path: '/test',
@@ -92,16 +91,16 @@ describe('withPathParams', () => {
       url: 'http://example.com/test',
       params: {},
     });
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
 
-    await withPathParams(request);
+    await withSpecValidation(request);
 
     expect((request as any).params).toEqual({});
   });
 });
 
-describe('withQueryParams', () => {
-  test('withQueryParams should use query from request when no schema provided', async () => {
+describe('withSpecValidation - query params', () => {
+  test('should use query from request when no schema provided', async () => {
     const operation: ContractOperation = {
       operationId: 'test',
       path: '/test',
@@ -113,14 +112,14 @@ describe('withQueryParams', () => {
       url: 'http://example.com/test?page=1&limit=10',
       query: { page: '1', limit: '10' },
     });
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
 
-    await withQueryParams(request);
+    await withSpecValidation(request);
 
     expect((request as any).validatedQuery).toEqual({ page: '1', limit: '10' });
   });
 
-  test('withQueryParams should handle empty query', async () => {
+  test('should handle empty query', async () => {
     const operation: ContractOperation = {
       operationId: 'test',
       path: '/test',
@@ -132,16 +131,16 @@ describe('withQueryParams', () => {
       url: 'http://example.com/test',
       query: {},
     });
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
 
-    await withQueryParams(request);
+    await withSpecValidation(request);
 
     expect((request as any).validatedQuery).toEqual({});
   });
 });
 
-describe('withHeaders', () => {
-  test('withHeaders should normalize Headers object when no schema provided', async () => {
+describe('withSpecValidation - headers', () => {
+  test('should normalize Headers object when no schema provided', async () => {
     const operation: ContractOperation = {
       operationId: 'test',
       path: '/test',
@@ -155,16 +154,16 @@ describe('withHeaders', () => {
       url: 'http://example.com/test',
       headers,
     });
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
 
-    await withHeaders(request);
+    await withSpecValidation(request);
 
     expect((request as any).validatedHeaders).toHaveProperty('authorization');
     expect((request.validatedHeaders as Record<string, string>).authorization).toBe('Bearer token');
   });
 
-  test('withHeaders should validate headers against schema when provided', async () => {
-    const operation: ContractOperation = {
+  test('should validate headers against schema when provided', async () => {
+    const operation: ContractOperation<any, any, any, any> = {
       operationId: 'test',
       path: '/test',
       method: 'GET',
@@ -180,14 +179,14 @@ describe('withHeaders', () => {
       url: 'http://example.com/test',
       headers,
     });
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
 
-    await withHeaders(request);
+    await withSpecValidation(request);
 
     expect((request as any).validatedHeaders).toHaveProperty('authorization');
   });
 
-  test('withHeaders should handle plain object headers', async () => {
+  test('should handle plain object headers', async () => {
     const operation: ContractOperation = {
       operationId: 'test',
       path: '/test',
@@ -199,15 +198,15 @@ describe('withHeaders', () => {
       url: 'http://example.com/test',
       headers: { authorization: 'Bearer token' },
     });
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
 
-    await withHeaders(request);
+    await withSpecValidation(request);
 
     expect(request.validatedHeaders).toHaveProperty('authorization');
   });
 
-  test('withHeaders should handle comma-separated Accept header with matching first value', async () => {
-    const operation: ContractOperation = {
+  test('should handle comma-separated Accept header with matching first value', async () => {
+    const operation: ContractOperation<any, any, any, any> = {
       operationId: 'test',
       path: '/test',
       method: 'POST',
@@ -221,18 +220,19 @@ describe('withHeaders', () => {
     headers.set('accept', 'application/json, text/html, application/xml');
     const request = createMockRequest({
       url: 'http://example.com/test',
+      method: 'POST',
       headers,
     });
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
 
-    await withHeaders(request);
+    await withSpecValidation(request);
 
     expect((request as any).validatedHeaders).toHaveProperty('accept');
     expect((request.validatedHeaders as Record<string, string>).accept).toBe('application/json');
   });
 
-  test('withHeaders should handle comma-separated Accept header with matching later value', async () => {
-    const operation: ContractOperation = {
+  test('should handle comma-separated Accept header with matching later value', async () => {
+    const operation: ContractOperation<any, any, any, any> = {
       operationId: 'test',
       path: '/test',
       method: 'POST',
@@ -246,18 +246,19 @@ describe('withHeaders', () => {
     headers.set('accept', 'text/html, application/xml, text/plain');
     const request = createMockRequest({
       url: 'http://example.com/test',
+      method: 'POST',
       headers,
     });
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
 
-    await withHeaders(request);
+    await withSpecValidation(request);
 
     expect((request as any).validatedHeaders).toHaveProperty('accept');
     expect((request.validatedHeaders as Record<string, string>).accept).toBe('application/xml');
   });
 
-  test('withHeaders should fail validation when no comma-separated Accept values match', async () => {
-    const operation: ContractOperation = {
+  test('should fail validation when no comma-separated Accept values match', async () => {
+    const operation: ContractOperation<any, any, any, any> = {
       operationId: 'test',
       path: '/test',
       method: 'POST',
@@ -271,17 +272,18 @@ describe('withHeaders', () => {
     headers.set('accept', 'text/html, text/plain');
     const request = createMockRequest({
       url: 'http://example.com/test',
+      method: 'POST',
       headers,
     });
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
 
-    await expect(withHeaders(request)).rejects.toThrow('Validation failed');
+    await expect(withSpecValidation(request)).rejects.toThrow('Validation failed');
   });
 });
 
-describe('withBody', () => {
-  test('withBody should parse JSON body when schema provided', async () => {
-    const operation: ContractOperation = {
+describe('withSpecValidation - body', () => {
+  test('should parse JSON body when schema provided', async () => {
+    const operation: ContractOperation<any, any, any, any> = {
       operationId: 'test',
       path: '/test',
       method: 'POST',
@@ -296,18 +298,19 @@ describe('withBody', () => {
     const bodyText = JSON.stringify({ name: 'John', email: 'john@example.com' });
     const request = createMockRequest({
       url: 'http://example.com/test',
+      method: 'POST',
       headers: { 'content-type': 'application/json' },
       text: async () => bodyText,
     });
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
 
-    await withBody(request);
+    await withSpecValidation(request);
 
     expect((request as any).validatedBody).toHaveProperty('name');
     expect((request as any).validatedBody).toHaveProperty('email');
   });
 
-  test('withBody should handle empty body when no schema provided', async () => {
+  test('should handle empty body when no schema provided', async () => {
     const operation: ContractOperation = {
       operationId: 'test',
       path: '/test',
@@ -319,13 +322,13 @@ describe('withBody', () => {
       url: 'http://example.com/test',
       text: async () => '',
     });
-    withContractOperation(operation)(request);
-    await withBody(request);
+    withMatchingContractOperation({ test: operation })(request);
+    await withSpecValidation(request);
 
     expect((request as any).validatedBody).toEqual({});
   });
 
-  test('withBody should handle already consumed body', async () => {
+  test('should handle already consumed body', async () => {
     const operation: ContractOperation<any, any, any, any> = {
       operationId: 'test',
       path: '/test',
@@ -336,12 +339,13 @@ describe('withBody', () => {
 
     const request = createMockRequest({
       url: 'http://example.com/test',
+      method: 'POST',
       text: async () => {
         throw new Error('Body already consumed');
       },
     });
-    withContractOperation(operation)(request);
-    await withBody(request);
+    withMatchingContractOperation({ test: operation })(request);
+    await withSpecValidation(request);
 
     // Should handle error gracefully by setting empty body
     expect((request as any).validatedBody).toEqual({});
@@ -361,7 +365,7 @@ describe('withResponseHelpers', () => {
     };
 
     const request = createMockRequest({ url: 'http://example.com/test' });
-    withContractOperation(operation)(request);
+    withMatchingContractOperation({ test: operation })(request);
     withResponseHelpers(request);
 
     expect((request as any).respond).toBeDefined();

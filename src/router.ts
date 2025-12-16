@@ -15,14 +15,11 @@ import type {
 import { createBasicResponseHelpers } from './utils';
 import {
   withMatchingContractOperation,
-  withPathParams,
-  withQueryParams,
-  withHeaders,
-  withBody,
+  withSpecValidation,
   withResponseHelpers,
   withContractFormat,
   withContractErrorHandler,
-} from './middleware.js';
+} from './middleware';
 
 /**
  * Creates a type-safe router from a contract definition
@@ -90,10 +87,7 @@ export const createRouter = <
   const before = [
     withParams as unknown as (request: RequestType, ...args: Args) => void,
     withMatchingContractOperation(options.contract, options.base),
-    withPathParams,
-    withQueryParams,
-    withHeaders,
-    withBody,
+    withSpecValidation,
     withResponseHelpers,
   ];
   if (options.before) before.push(...options.before);
