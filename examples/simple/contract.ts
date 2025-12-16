@@ -167,10 +167,9 @@ export const contract = createContract({
     requests: {
       'application/json': { body: CalculatePostRequest },
       'application/multipart-form-data': {
-        body: z.string().min(1).max(10000).meta({
-          title: 'Multipart Form Data',
-          description: 'The multipart form data',
-          example: `Content-Type: application/multipart-form-data\n\n--boundary\nContent-Disposition: form-data; name="a"\n\n10\n--boundary\nContent-Disposition: form-data; name="b"\n\n20\n--boundary--`,
+        body: z.codec(z.string().min(1).max(10000), z.object({ a: z.number(), b: z.number() }), {
+          decode: (val) => new URLSearchParams(val).toJSON() as unknown as { a: number; b: number },
+          encode: (val) => new URLSearchParams(val as unknown as Record<string, string>).toString(),
         }),
       },
     },

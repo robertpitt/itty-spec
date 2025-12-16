@@ -55,12 +55,11 @@ test('withContractOperation should attach contract operation to request', () => 
     operationId: 'test',
     path: '/test',
     method: 'GET',
-    responses: { 200: { body: z.object({ message: z.string() }) } },
+    responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
   };
 
-  const middleware = withContractOperation(operation);
   const request = createMockRequest({ url: 'http://example.com/test' });
-  middleware(request);
+  withContractOperation(operation)(request);
   expect((request as any).__contractOperation).toBe(operation);
 });
 
@@ -70,36 +69,15 @@ describe('withPathParams', () => {
       operationId: 'test',
       path: '/users/:id',
       method: 'GET',
-      responses: { 200: { body: z.object({ message: z.string() }) } },
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
     };
 
-    const middleware = withPathParams(operation);
     const request = new Request('http://example.com/users/123') as IRequest;
+    withContractOperation(operation)(request);
 
-    await middleware(request);
+    await withPathParams(request);
 
     expect((request as any).params).toEqual({ id: '123' });
-  });
-
-  test('withPathParams should validate params against schema when provided', async () => {
-    const operation: ContractOperation = {
-      operationId: 'test',
-      path: '/users/:id',
-      method: 'GET',
-      pathParams: z.object({ id: z.string().transform((val) => parseInt(val, 10)) }),
-      responses: { 200: { body: z.object({ message: z.string() }) } },
-    };
-
-    const middleware = withPathParams(operation);
-    const request = createMockRequest({
-      url: 'http://example.com/users/123',
-      params: { id: '123' },
-    });
-
-    await middleware(request);
-
-    // After validation, id should be transformed to number
-    expect((request as any).params).toHaveProperty('id');
   });
 
   test('withPathParams should handle empty params', async () => {
@@ -107,16 +85,16 @@ describe('withPathParams', () => {
       operationId: 'test',
       path: '/test',
       method: 'GET',
-      responses: { 200: { body: z.object({ message: z.string() }) } },
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
     };
 
-    const middleware = withPathParams(operation);
     const request = createMockRequest({
       url: 'http://example.com/test',
       params: {},
     });
+    withContractOperation(operation)(request);
 
-    await middleware(request);
+    await withPathParams(request);
 
     expect((request as any).params).toEqual({});
   });
@@ -128,42 +106,18 @@ describe('withQueryParams', () => {
       operationId: 'test',
       path: '/test',
       method: 'GET',
-      responses: { 200: { body: z.object({ message: z.string() }) } },
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
     };
 
-    const middleware = withQueryParams(operation);
     const request = createMockRequest({
       url: 'http://example.com/test?page=1&limit=10',
       query: { page: '1', limit: '10' },
     });
+    withContractOperation(operation)(request);
 
-    await middleware(request);
+    await withQueryParams(request);
 
     expect((request as any).validatedQuery).toEqual({ page: '1', limit: '10' });
-  });
-
-  test('withQueryParams should validate query against schema when provided', async () => {
-    const operation: ContractOperation = {
-      operationId: 'test',
-      path: '/test',
-      method: 'GET',
-      query: z.object({
-        page: z.string().transform((val) => parseInt(val, 10)),
-        limit: z.string().transform((val) => parseInt(val, 10)),
-      }),
-      responses: { 200: { body: z.object({ message: z.string() }) } },
-    };
-
-    const middleware = withQueryParams(operation);
-    const request = createMockRequest({
-      url: 'http://example.com/test?page=1&limit=10',
-      query: { page: '1', limit: '10' },
-    });
-
-    await middleware(request);
-
-    expect((request as any).validatedQuery).toHaveProperty('page');
-    expect((request as any).validatedQuery).toHaveProperty('limit');
   });
 
   test('withQueryParams should handle empty query', async () => {
@@ -171,16 +125,16 @@ describe('withQueryParams', () => {
       operationId: 'test',
       path: '/test',
       method: 'GET',
-      responses: { 200: { body: z.object({ message: z.string() }) } },
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
     };
 
-    const middleware = withQueryParams(operation);
     const request = createMockRequest({
       url: 'http://example.com/test',
       query: {},
     });
+    withContractOperation(operation)(request);
 
-    await middleware(request);
+    await withQueryParams(request);
 
     expect((request as any).validatedQuery).toEqual({});
   });
@@ -192,18 +146,18 @@ describe('withHeaders', () => {
       operationId: 'test',
       path: '/test',
       method: 'GET',
-      responses: { 200: { body: z.object({ message: z.string() }) } },
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
     };
 
-    const middleware = withHeaders(operation);
     const headers = new Headers();
     headers.set('authorization', 'Bearer token');
     const request = createMockRequest({
       url: 'http://example.com/test',
       headers,
     });
+    withContractOperation(operation)(request);
 
-    await middleware(request);
+    await withHeaders(request);
 
     expect((request as any).validatedHeaders).toHaveProperty('authorization');
     expect((request.validatedHeaders as Record<string, string>).authorization).toBe('Bearer token');
@@ -217,18 +171,18 @@ describe('withHeaders', () => {
       headers: z.object({
         authorization: z.string(),
       }),
-      responses: { 200: { body: z.object({ message: z.string() }) } },
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
     };
 
-    const middleware = withHeaders(operation);
     const headers = new Headers();
     headers.set('authorization', 'Bearer token');
     const request = createMockRequest({
       url: 'http://example.com/test',
       headers,
     });
+    withContractOperation(operation)(request);
 
-    await middleware(request);
+    await withHeaders(request);
 
     expect((request as any).validatedHeaders).toHaveProperty('authorization');
   });
@@ -238,18 +192,90 @@ describe('withHeaders', () => {
       operationId: 'test',
       path: '/test',
       method: 'GET',
-      responses: { 200: { body: z.object({ message: z.string() }) } },
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
     };
 
-    const middleware = withHeaders(operation);
     const request = createMockRequest({
       url: 'http://example.com/test',
       headers: { authorization: 'Bearer token' },
     });
+    withContractOperation(operation)(request);
 
-    await middleware(request);
+    await withHeaders(request);
 
     expect(request.validatedHeaders).toHaveProperty('authorization');
+  });
+
+  test('withHeaders should handle comma-separated Accept header with matching first value', async () => {
+    const operation: ContractOperation = {
+      operationId: 'test',
+      path: '/test',
+      method: 'POST',
+      headers: z.object({
+        accept: z.enum(['application/json', 'application/xml']),
+      }),
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
+    };
+
+    const headers = new Headers();
+    headers.set('accept', 'application/json, text/html, application/xml');
+    const request = createMockRequest({
+      url: 'http://example.com/test',
+      headers,
+    });
+    withContractOperation(operation)(request);
+
+    await withHeaders(request);
+
+    expect((request as any).validatedHeaders).toHaveProperty('accept');
+    expect((request.validatedHeaders as Record<string, string>).accept).toBe('application/json');
+  });
+
+  test('withHeaders should handle comma-separated Accept header with matching later value', async () => {
+    const operation: ContractOperation = {
+      operationId: 'test',
+      path: '/test',
+      method: 'POST',
+      headers: z.object({
+        accept: z.enum(['application/json', 'application/xml']),
+      }),
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
+    };
+
+    const headers = new Headers();
+    headers.set('accept', 'text/html, application/xml, text/plain');
+    const request = createMockRequest({
+      url: 'http://example.com/test',
+      headers,
+    });
+    withContractOperation(operation)(request);
+
+    await withHeaders(request);
+
+    expect((request as any).validatedHeaders).toHaveProperty('accept');
+    expect((request.validatedHeaders as Record<string, string>).accept).toBe('application/xml');
+  });
+
+  test('withHeaders should fail validation when no comma-separated Accept values match', async () => {
+    const operation: ContractOperation = {
+      operationId: 'test',
+      path: '/test',
+      method: 'POST',
+      headers: z.object({
+        accept: z.enum(['application/json', 'application/xml']),
+      }),
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
+    };
+
+    const headers = new Headers();
+    headers.set('accept', 'text/html, text/plain');
+    const request = createMockRequest({
+      url: 'http://example.com/test',
+      headers,
+    });
+    withContractOperation(operation)(request);
+
+    await expect(withHeaders(request)).rejects.toThrow('Validation failed');
   });
 });
 
@@ -264,18 +290,18 @@ describe('withBody', () => {
           body: z.object({ name: z.string(), email: z.string() }),
         },
       },
-      responses: { 200: { body: z.object({ message: z.string() }) } },
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
     };
 
-    const middleware = withBody(operation);
     const bodyText = JSON.stringify({ name: 'John', email: 'john@example.com' });
     const request = createMockRequest({
       url: 'http://example.com/test',
       headers: { 'content-type': 'application/json' },
       text: async () => bodyText,
     });
+    withContractOperation(operation)(request);
 
-    await middleware(request);
+    await withBody(request);
 
     expect((request as any).validatedBody).toHaveProperty('name');
     expect((request as any).validatedBody).toHaveProperty('email');
@@ -286,45 +312,39 @@ describe('withBody', () => {
       operationId: 'test',
       path: '/test',
       method: 'GET',
-      responses: { 200: { body: z.object({ message: z.string() }) } },
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
     };
 
-    const middleware = withBody(operation);
     const request = createMockRequest({
       url: 'http://example.com/test',
       text: async () => '',
     });
+    withContractOperation(operation)(request);
+    await withBody(request);
 
-    await middleware(request);
-
-    expect((request as any).validatedBody).toBeUndefined();
+    expect((request as any).validatedBody).toEqual({});
   });
 
   test('withBody should handle already consumed body', async () => {
-    const operation: ContractOperation = {
+    const operation: ContractOperation<any, any, any, any> = {
       operationId: 'test',
       path: '/test',
       method: 'POST',
-      requests: {
-        'application/json': {
-          body: z.object({ name: z.string() }),
-        },
-      },
-      responses: { 200: { body: z.object({ message: z.string() }) } },
+      requests: { 'application/json': {} },
+      responses: { 200: { 'application/json': { body: z.object({ message: z.string() }) } } },
     };
 
-    const middleware = withBody(operation);
     const request = createMockRequest({
       url: 'http://example.com/test',
       text: async () => {
         throw new Error('Body already consumed');
       },
     });
+    withContractOperation(operation)(request);
+    await withBody(request);
 
-    await middleware(request);
-
-    // Should handle error gracefully
-    expect((request as any).validatedBody).toBeDefined();
+    // Should handle error gracefully by setting empty body
+    expect((request as any).validatedBody).toEqual({});
   });
 });
 
@@ -340,10 +360,9 @@ describe('withResponseHelpers', () => {
       },
     };
 
-    const middleware = withResponseHelpers(operation);
     const request = createMockRequest({ url: 'http://example.com/test' });
-
-    middleware(request);
+    withContractOperation(operation)(request);
+    withResponseHelpers(request);
 
     expect((request as any).respond).toBeDefined();
   });

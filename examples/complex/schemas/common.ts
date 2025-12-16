@@ -60,7 +60,7 @@ export const PaginationMeta = z
 export const AuthHeaders = z
   .object({
     authorization: z
-      .string()
+      .jwt({ alg: 'HS256' })
       .startsWith('Bearer ')
       .meta({ title: 'Authorization', description: 'Bearer token for authentication' }),
   })

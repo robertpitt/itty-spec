@@ -9,7 +9,6 @@ import { orderHandlers } from './handlers/orders.handlers';
 import { initializeSampleData } from './utils/database';
 import { createSpotlightElementsHtml } from './utils/docs';
 import { withAuth } from './middleware/auth.middleware';
-import type { AuthenticatedRequest } from './middleware/auth.middleware';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -20,6 +19,23 @@ const openApiSpecification = createOpenApiSpecification(contract, {
   title: 'Complex API',
   version: '1.0.0',
   description: readFileSync(join(import.meta.dirname, 'description.md'), 'utf8'),
+  servers: [{ url: 'http://localhost:3000', description: 'Localhost' }],
+  contact: {
+    name: 'API Support',
+    url: 'https://www.example.com/support',
+    email: 'support@example.com',
+  },
+  license: {
+    identifier: 'MIT',
+    name: 'MIT License',
+    url: 'https://opensource.org/licenses/MIT',
+  },
+  termsOfService: 'https://www.example.com/terms',
+  tags: [
+    { name: 'Users', description: 'User management endpoints' },
+    { name: 'Products', description: 'Product management endpoints' },
+    { name: 'Orders', description: 'Order management endpoints' },
+  ],
 });
 
 /**

@@ -12,7 +12,7 @@ import type { IRequest, RequestHandler, ResponseHandler } from 'itty-router';
 // 2. **Schema Maps**:
 //    - RequestByContentType: content-type → request schema
 //    - ResponseByContentType: content-type → response schema
-//    - ResponseByStatusCode: status-code → ResponseByContentType (explicit numeric codes only)
+//    - ResponseByStatusCode: status-code → ResponseByContentType
 // 3. **Reusable Helpers**: Generic utilities for schema inference and extraction
 // 4. **Operation Types**: ContractOperation definition and its parameter extractors
 // 5. **Router Types**: Request/response types for handlers and middleware
@@ -112,10 +112,24 @@ export type RequestSchemas<T extends RequestByContentType | undefined> = T exten
  * }
  * ```
  *
+ * Validates that:
+ * - If 200 is present, default is optional
+ * - If 200 is not present, default is required (to encourage explicit status codes)
+ *
  * Uses Partial<Record<number, ...>> instead of Record<number, ...> to preserve
- * literal key types for better type inference.
+ * literal key types, allowing the `200 extends keyof T` check to work correctly.
  */
-export type ResponseByStatusCode = Partial<Record<number, ResponseByContentType>>;
+type ResponseByStatusCode = Partial<Record<number, ResponseByContentType>> & {
+  default?: ResponseByContentType;
+};
+
+/**
+ * Response schemas type with validation rules.
+ * Ensures proper structure and default handling for response definitions.
+ */
+export type ResponseSchemas<T extends ResponseByStatusCode> = 200 extends keyof T
+  ? T & Partial<Record<'default', ResponseByContentType>>
+  : T & Required<Pick<T, 'default'>>;
 
 /**
  * HTTP method types
@@ -129,9 +143,8 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 
  * which is necessary for ExtractPathParams to work correctly.
  *
  * - `operationId` is optional - if omitted, the contract key will be used as the default
- * - `method` is required - must be explicitly specified
+ * - `method` is optional - if omitted, defaults to 'GET'
  * - `requests` must be a RequestByContentType map (content-type keyed object)
- * - `responses` must explicitly define numeric status codes (no default responses)
  */
 export type ContractOperation<
   TPathParams extends StandardSchemaV1 | undefined = undefined,
@@ -152,7 +165,7 @@ export type ContractOperation<
   query?: TQuery;
   requests?: RequestSchemas<TRequests>;
   headers?: THeaders;
-  responses: TResponses;
+  responses: ResponseSchemas<TResponses>;
 };
 
 /**
@@ -246,18 +259,6 @@ type InferOptionalSchema<
     : TDefault;
 
 /**
- * Extract body type from a request content-type map.
- * Returns a union of all body types across all content types.
- */
-type ExtractBodyFromRequestMap<T extends RequestByContentType> = {
-  [K in keyof T]: T[K] extends { body: infer TBody }
-    ? TBody extends StandardSchemaV1
-      ? StandardSchemaV1.InferOutput<TBody>
-      : never
-    : never;
-}[keyof T];
-
-/**
  * Extract body type from a response content-type map.
  * Returns a union of all body types across all content types.
  */
@@ -322,7 +323,13 @@ export type ContractOperationQuery<O extends AnyContractOperation> = InferOption
 export type ContractOperationBody<O extends AnyContractOperation> = O['requests'] extends undefined
   ? undefined
   : O['requests'] extends RequestByContentType
-    ? ExtractBodyFromRequestMap<O['requests']>
+    ? {
+        [K in keyof O['requests']]: O['requests'][K] extends { body: infer TBody }
+          ? TBody extends StandardSchemaV1
+            ? StandardSchemaV1.InferOutput<TBody>
+            : never
+          : never;
+      }[keyof O['requests']]
     : undefined;
 
 /**
@@ -456,7 +463,7 @@ export type RespondOptions<
 export type ContractOperationResponseHelpers<O extends ContractOperation> = {
   /**
    * Create a response with typed body, status code, and content type
-   * TypeScript ensures the status code and content type exist in the contract
+   * Validates that the status code and content type exist in the contract
    * and body/headers match the schemas
    */
   respond<S extends ContractOperationStatusCodes<O>, C extends ExtractContentTypes<O, S>>(

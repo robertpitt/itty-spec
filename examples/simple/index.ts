@@ -74,24 +74,9 @@ const router = createRouter({
     },
     postCalculate: async (request) => {
       const result = request.validatedBody.a + request.validatedBody.b;
-      const contentType = getPreferredContentType(request.headers.get('Accept'));
 
       if (result > 100) {
         const errorMessage = 'Invalid request';
-        if (contentType === 'text/html') {
-          return request.respond({
-            status: 400,
-            contentType: 'text/html',
-            body: formatCalculateErrorHTML(errorMessage),
-          });
-        }
-        if (contentType === 'application/xml') {
-          return request.respond({
-            status: 400,
-            contentType: 'application/xml',
-            body: formatCalculateErrorXML(errorMessage),
-          });
-        }
         return request.respond({
           status: 400,
           contentType: 'application/json',
@@ -99,20 +84,6 @@ const router = createRouter({
         });
       }
 
-      if (contentType === 'text/html') {
-        return request.respond({
-          status: 200,
-          contentType: 'text/html',
-          body: formatCalculateResponseHTML(result),
-        });
-      }
-      if (contentType === 'application/xml') {
-        return request.respond({
-          status: 200,
-          contentType: 'application/xml',
-          body: formatCalculateResponseXML(result),
-        });
-      }
       return request.respond({
         status: 200,
         contentType: 'application/json',

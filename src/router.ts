@@ -15,11 +15,11 @@ import type {
 import { createBasicResponseHelpers } from './utils';
 import {
   withMatchingContractOperation,
-  withGlobalPathParams,
-  withGlobalQueryParams,
-  withGlobalHeaders,
-  withGlobalBody,
-  withGlobalResponseHelpers,
+  withPathParams,
+  withQueryParams,
+  withHeaders,
+  withBody,
+  withResponseHelpers,
   withContractFormat,
   withContractErrorHandler,
 } from './middleware.js';
@@ -107,15 +107,15 @@ export const createRouter = <
       // Attach the contract to the request object
       withMatchingContractOperation(options.contract, options.base),
       // Use the contract operation to validate the request path
-      withGlobalPathParams,
+      withPathParams,
       // Use the contract operation to validate the request query params
-      withGlobalQueryParams,
+      withQueryParams,
       // Use the contract operation to validate the request headers
-      withGlobalHeaders,
+      withHeaders,
       // Use the contract operation to validate the request body
-      withGlobalBody,
+      withBody,
       // Use the contract operation to validate the response
-      withGlobalResponseHelpers,
+      withResponseHelpers,
       // Pass user defined before middleware to the chain
       ...(options.before || []),
     ],

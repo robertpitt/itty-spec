@@ -1,15 +1,7 @@
 import type { IRequest, RequestHandler, ResponseHandler } from 'itty-router';
 import { error, json } from 'itty-router';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
-import type {
-  ContractOperation,
-  ContractOperationParameters,
-  ContractOperationQuery,
-  ContractOperationBody,
-  ContractOperationHeaders,
-  ContractAugmentedRequest,
-  RequestByContentType,
-} from './types.js';
+import type { ContractOperation, ContractAugmentedRequest } from './types.js';
 import { createResponseHelpers, validateSchema, defineProp } from './utils.js';
 
 /**
@@ -144,22 +136,6 @@ function extractPathParamsFromUrl(pathPattern: string, url: string): Record<stri
   }
   return params;
 }
-
-export function withPathParams<TOperation extends ContractOperation>(
-  operation: TOperation
-): RequestHandler<IRequest> {
-  return async (request: IRequest) => {
-    let requestParams = (request.params as Record<string, string> | undefined) || {};
-    if (!Object.keys(requestParams).length && request.url) {
-      requestParams = extractPathParamsFromUrl(operation.path, request.url);
-    }
-    const params = operation.pathParams
-      ? await validateSchema<Record<string, string>>(operation.pathParams, requestParams)
-      : requestParams;
-    defineProp(request, 'params', params as ContractOperationParameters<TOperation>);
-  };
-}
-
 /**
  * Middleware factory: Parses and validates query parameters according to the contract
  * Extends the request with typed query property
@@ -181,45 +157,6 @@ function extractQueryParamsFromUrl(url: string): Record<string, unknown> {
     });
   } catch {}
   return query;
-}
-
-export function withQueryParams<TOperation extends ContractOperation>(
-  operation: TOperation
-): RequestHandler<IRequest> {
-  return async (request: IRequest) => {
-    let requestQuery = (request.query as Record<string, unknown> | undefined) || {};
-    if (!Object.keys(requestQuery).length && request.url) {
-      requestQuery = extractQueryParamsFromUrl(request.url);
-    }
-    const query = operation.query
-      ? await validateSchema<Record<string, unknown>>(operation.query, requestQuery)
-      : requestQuery;
-    const typedQuery = query as ContractOperationQuery<TOperation>;
-    defineProp(request, 'validatedQuery', typedQuery);
-    defineProp(request, 'query', typedQuery);
-  };
-}
-
-/**
- * Middleware factory: Parses and validates request headers according to the contract
- * Extends the request with typed headers property
- *
- * Execution order: This middleware runs after withQueryParams. It extracts headers from
- * the request and validates them against the contract's headers schema if provided.
- *
- * @param operation - The contract operation containing headers schema (optional)
- * @returns A middleware function that validates and attaches typed headers to the request
- */
-export function withHeaders<TOperation extends ContractOperation>(
-  operation: TOperation
-): RequestHandler<IRequest> {
-  return async (request: IRequest) => {
-    const requestHeaders = normalizeHeaders(request.headers);
-    const headers = operation.headers
-      ? await validateSchema<Record<string, unknown>>(operation.headers, requestHeaders)
-      : requestHeaders;
-    defineProp(request, 'validatedHeaders', headers as ContractOperationHeaders<TOperation>);
-  };
 }
 
 /**
@@ -258,98 +195,10 @@ function parseBodyByContentType(contentType: string | null, bodyText: string): u
 }
 
 /**
- * Middleware factory: Parses and validates request body according to the contract
- * Extends the request with typed body property
- *
- * Execution order: This middleware runs after withHeaders. It reads and parses the request
- * body, then validates it against the contract's request schema if provided.
- *
- * IMPORTANT: Request bodies can only be read once. If the body has already been consumed
- * (e.g., by previous middleware), this will use an empty object and validation will fail
- * if a body is required by the contract.
- *
- * @param operation - The contract operation containing request body schema (optional)
- * @returns A middleware function that validates and attaches typed body to the request
- */
-export function withBody<TOperation extends ContractOperation>(
-  operation: TOperation
-): RequestHandler<IRequest> {
-  return async (request: IRequest) => {
-    if (!operation.requests) return;
-
-    let bodyData: unknown = {};
-    let bodyReadSuccessfully = false;
-    let bodyText = '';
-
-    try {
-      bodyText = await request.text();
-      bodyReadSuccessfully = true;
-    } catch {
-      bodyData = {};
-    }
-
-    if (bodyReadSuccessfully && bodyText.trim()) {
-      // requests must be a content-type map
-      const requestByContentType = operation.requests as RequestByContentType;
-      const contentType = getContentType(request);
-      if (!contentType) {
-        throw error(400, 'Content-Type header is required');
-      }
-
-      // Find matching schema (case-insensitive)
-      const matchingEntry = Object.entries(requestByContentType).find(([key]) => {
-        return key.toLowerCase() === contentType;
-      });
-
-      if (!matchingEntry) {
-        throw error(
-          400,
-          `Unsupported Content-Type: ${contentType}. Supported types: ${Object.keys(requestByContentType).join(', ')}`
-        );
-      }
-
-      const [, requestSchema] = matchingEntry;
-      if (!requestSchema || typeof requestSchema !== 'object' || !('body' in requestSchema)) {
-        throw error(500, 'Invalid request schema configuration');
-      }
-      bodyData = parseBodyByContentType(contentType, bodyText);
-      const body = await validateSchema<ContractOperationBody<TOperation>>(
-        (requestSchema as { body: StandardSchemaV1 }).body,
-        bodyData
-      );
-      defineProp(request, 'validatedBody', body);
-    } else {
-      // Empty body
-      defineProp(request, 'validatedBody', bodyData as ContractOperationBody<TOperation>);
-    }
-  };
-}
-
-/**
- * Middleware factory: Attaches typed response helper methods to the request object
- * These helpers provide type-safe response creation based on the contract's response schemas
- *
- * Execution order: This middleware runs last in the chain, after withBody. It attaches
- * response helper methods (respond) to the request object that handlers can use to create
- * type-safe responses.
- *
- * @param operation - The contract operation to create response helpers for
- * @returns A middleware function that attaches response helpers to the request
- */
-export function withResponseHelpers<TOperation extends ContractOperation>(
-  operation: TOperation
-): RequestHandler<IRequest> {
-  return (request: IRequest) => {
-    const helpers = createResponseHelpers(operation);
-    defineProp(request, 'respond', helpers.respond);
-  };
-}
-
-/**
  * Global middleware: Validates path parameters using the operation from request
  * This reads from __contractOperation set by withMatchingContractOperation
  */
-export const withGlobalPathParams: RequestHandler<IRequest> = async (request: IRequest) => {
+export const withPathParams: RequestHandler<IRequest> = async (request: IRequest) => {
   const operation = (request as ContractAugmentedRequest).__contractOperation;
   if (!operation) return;
 
@@ -367,7 +216,7 @@ export const withGlobalPathParams: RequestHandler<IRequest> = async (request: IR
  * Global middleware: Validates query parameters using the operation from request
  * This reads from __contractOperation set by withMatchingContractOperation
  */
-export const withGlobalQueryParams: RequestHandler<IRequest> = async (request: IRequest) => {
+export const withQueryParams: RequestHandler<IRequest> = async (request: IRequest) => {
   const operation = (request as ContractAugmentedRequest).__contractOperation;
   if (!operation) return;
 
@@ -383,16 +232,63 @@ export const withGlobalQueryParams: RequestHandler<IRequest> = async (request: I
 };
 
 /**
+ * Try to validate headers, handling comma-separated values for specific headers
+ */
+async function validateHeadersWithFallback(
+  schema: StandardSchemaV1,
+  headers: Record<string, string>
+): Promise<Record<string, unknown>> {
+  try {
+    // Try validating with original values first
+    return await validateSchema<Record<string, unknown>>(schema, headers);
+  } catch (err) {
+    // If validation fails, try handling comma-separated values for certain headers
+    const headersToSplit = ['accept', 'accept-encoding', 'accept-language'];
+    const modifiedHeaders = { ...headers };
+    let modified = false;
+
+    for (const headerName of headersToSplit) {
+      if (modifiedHeaders[headerName] && modifiedHeaders[headerName].includes(',')) {
+        // Split by comma and try each value
+        const values = modifiedHeaders[headerName].split(',').map((v) => v.trim());
+
+        for (const value of values) {
+          try {
+            // Try validating with this single value
+            const testHeaders = { ...headers, [headerName]: value };
+            const validated = await validateSchema<Record<string, unknown>>(schema, testHeaders);
+            // If validation succeeds, use this value
+            modifiedHeaders[headerName] = value;
+            modified = true;
+            break;
+          } catch {
+            // Continue to next value
+          }
+        }
+      }
+    }
+
+    if (modified) {
+      // Try validation again with modified headers
+      return await validateSchema<Record<string, unknown>>(schema, modifiedHeaders);
+    }
+
+    // If no modifications helped, rethrow original error
+    throw err;
+  }
+}
+
+/**
  * Global middleware: Validates headers using the operation from request
  * This reads from __contractOperation set by withMatchingContractOperation
  */
-export const withGlobalHeaders: RequestHandler<IRequest> = async (request: IRequest) => {
+export const withHeaders: RequestHandler<IRequest> = async (request: IRequest) => {
   const operation = (request as ContractAugmentedRequest).__contractOperation;
   if (!operation) return;
 
   const requestHeaders = normalizeHeaders(request.headers);
   const headers = operation.headers
-    ? await validateSchema<Record<string, unknown>>(operation.headers, requestHeaders)
+    ? await validateHeadersWithFallback(operation.headers, requestHeaders)
     : requestHeaders;
   defineProp(request, 'validatedHeaders', headers);
 };
@@ -401,9 +297,15 @@ export const withGlobalHeaders: RequestHandler<IRequest> = async (request: IRequ
  * Global middleware: Validates body using the operation from request
  * This reads from __contractOperation set by withMatchingContractOperation
  */
-export const withGlobalBody: RequestHandler<IRequest> = async (request: IRequest) => {
+export const withBody: RequestHandler<IRequest> = async (request: IRequest) => {
   const operation = (request as ContractAugmentedRequest).__contractOperation;
-  if (!operation || !operation.requests) return;
+  if (!operation) return;
+
+  // If no request schemas defined, set empty body and return
+  if (!operation.requests) {
+    defineProp(request, 'validatedBody', {});
+    return;
+  }
 
   let bodyData: unknown = {};
   let bodyReadSuccessfully = false;
@@ -453,7 +355,7 @@ export const withGlobalBody: RequestHandler<IRequest> = async (request: IRequest
  * Global middleware: Attaches response helpers using the operation from request
  * This reads from __contractOperation set by withMatchingContractOperation
  */
-export const withGlobalResponseHelpers: RequestHandler<IRequest> = (request: IRequest) => {
+export const withResponseHelpers: RequestHandler<IRequest> = (request: IRequest) => {
   const operation = (request as ContractAugmentedRequest).__contractOperation;
   if (!operation) return;
 
