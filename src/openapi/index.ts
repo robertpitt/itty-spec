@@ -10,6 +10,15 @@ import { OpenAPIV3_1 } from './types';
 import { extractSchema } from './vendors';
 
 /**
+ * Schema registry for deduplication and reference management
+ */
+type SchemaRegistry = {
+  schemas: Record<string, OpenAPIV3_1.SchemaObject>;
+  schemaIds: Map<StandardSchemaV1, string>;
+  nextId: number;
+};
+
+/**
  * Options for the OpenAPI specification generator
  */
 export type OpenApiSpecificationOptions = {
@@ -37,40 +46,32 @@ export const createOpenApiSpecification = (
 
   return {
     openapi: '3.1.1',
-    info: {
-      title: options.title,
-      version: options.version,
-      description: options.description,
-      termsOfService: options.termsOfService,
-      contact: options.contact,
-      license: options.license,
-      summary: options.summary,
-    },
+    info: createOpenApiInfo(options),
     servers: options.servers,
-    components: {
-      schemas: registry.schemas,
-    },
+    components: createOpenApiComponents(contract, registry),
     paths: createOpenApiPaths(contract, registry),
   };
 };
 
-/**
- * Schema registry for deduplication and reference management
- */
-type SchemaRegistry = {
-  schemas: Record<string, OpenAPIV3_1.SchemaObject>;
-  schemaIds: Map<StandardSchemaV1, string>;
-  nextId: number;
+export const createOpenApiInfo = (options: OpenApiSpecificationOptions): OpenAPIV3_1.InfoObject => {
+  return {
+    title: options.title,
+    version: options.version,
+    description: options.description,
+    termsOfService: options.termsOfService,
+    contact: options.contact,
+    license: options.license,
+    summary: options.summary,
+  };
 };
 
 /**
  * Creates the OpenAPI components
  */
 export const createOpenApiComponents = (
-  contract: ContractDefinition
+  contract: ContractDefinition,
+  registry: SchemaRegistry
 ): OpenAPIV3_1.ComponentsObject => {
-  const registry = createSchemaRegistry();
-  collectSchemasFromContract(contract, registry);
   return {
     schemas: registry.schemas,
   };
