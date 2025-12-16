@@ -4,7 +4,6 @@ import {
   type IRequest,
   withParams,
   error,
-  type RequestHandler,
   type ResponseHandler,
 } from 'itty-router';
 import type {
@@ -15,15 +14,12 @@ import type {
 } from './types';
 import { createBasicResponseHelpers } from './utils';
 import {
-  withContractOperation,
-  withPathParams,
-  withQueryParams,
-  withHeaders,
-  withBody,
+  withMatchingContractOperation,
+  withSpecValidation,
   withResponseHelpers,
   withContractFormat,
   withContractErrorHandler,
-} from './middleware.js';
+} from './middleware';
 
 /**
  * Creates a type-safe router from a contract definition
@@ -32,7 +28,7 @@ import {
  * - Automatic route registration based on contract operations
  * - Type-safe request/response handling
  * - Automatic validation of path params, query params, headers, and body
- * - Type-safe response helpers (json, error, noContent)
+ * - Type-safe response helpers (respond)
  *
  * @typeParam TContract - The contract definition type
  * @typeParam RequestType - The request type (extends IRequest)
@@ -55,7 +51,11 @@ import {
  *   contract: myContract,
  *   handlers: {
  *     getUsers: async (request) => {
- *       return request.json({ users: [] }, 200);
+ *       return request.respond({
+ *         status: 200,
+ *         contentType: 'application/json',
+ *         body: { users: [] },
+ *       });
  *     },
  *   },
  * });
@@ -68,58 +68,51 @@ export const createRouter = <
 >(
   options: ContractRouterOptions<TContract, RequestType, Args>
 ) => {
-  const wrappedMissingHandler: RequestHandler<RequestType, Args> = (
-    request: RequestType,
-    ...args: Args
+  const missingHandler: ResponseHandler = (
+    response: unknown,
+    request: unknown,
+    ...args: unknown[]
   ) => {
+    if (response != null) return response as Response;
     if (options.missing) {
       return options.missing(
-        { ...request, ...createBasicResponseHelpers() } as RequestType &
+        { ...(request as RequestType), ...createBasicResponseHelpers() } as RequestType &
           ReturnType<typeof createBasicResponseHelpers>,
-        ...args
+        ...(args as Args)
       );
     }
     return error(404);
   };
 
-  const beforeMiddleware: RequestHandler<RequestType, Args>[] = [
-    withParams as unknown as RequestHandler<RequestType, Args>,
-    ...(options.before || []),
+  const before = [
+    withParams as unknown as (request: RequestType, ...args: Args) => void,
+    withMatchingContractOperation(options.contract, options.base),
+    withSpecValidation,
+    withResponseHelpers,
   ];
-  const errorHandler = withContractErrorHandler<RequestType, Args>();
-  const finallyHandlers: ResponseHandler[] = [
-    ((response: any, request: any, ...args: any[]) =>
-      response == null
-        ? wrappedMissingHandler(request as RequestType, ...(args as Args))
-        : (response as Response)) as unknown as ResponseHandler,
-    withContractFormat(options.format),
-    ...(options.finally || []),
-  ];
+  if (options.before) before.push(...options.before);
+
+  const finally_ = [missingHandler, withContractFormat(options.format)];
+  if (options.finally) finally_.push(...options.finally);
 
   const router = Router<RequestType, Args, Response>({
     base: options.base,
-    before: beforeMiddleware,
-    catch: errorHandler,
-    finally: finallyHandlers,
+    before,
+    catch: withContractErrorHandler<RequestType, Args>(),
+    finally: finally_,
   });
 
   for (const [contractKey, operation] of Object.entries(options.contract)) {
     const handler = options.handlers[contractKey as keyof TContract];
     if (!handler) continue;
-    const operationWithDefaults = {
-      ...operation,
-      operationId: operation.operationId ?? contractKey,
-      method: operation.method ?? 'GET',
-    };
-    const method = operationWithDefaults.method.toLowerCase() as Lowercase<HttpMethod>;
-    router[method]<IRequest, Args>(
+    if (!operation.method) {
+      throw new Error(
+        `Contract operation "${contractKey}" must explicitly specify a method. ` +
+          `Found: undefined. Please add method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS'`
+      );
+    }
+    router[operation.method.toLowerCase() as Lowercase<HttpMethod>]<IRequest, Args>(
       operation.path,
-      withContractOperation(operationWithDefaults),
-      withPathParams(operationWithDefaults),
-      withQueryParams(operationWithDefaults),
-      withHeaders(operationWithDefaults),
-      withBody(operationWithDefaults),
-      withResponseHelpers(operationWithDefaults),
       async (request: IRequest, ...args: Args) =>
         handler(request as ContractRequest<TContract[keyof TContract]>, ...args)
     );

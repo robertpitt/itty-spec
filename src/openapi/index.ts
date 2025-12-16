@@ -1,7 +1,22 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec';
-import { ContractDefinition, ContractOperation, HttpMethod, ResponseSchema } from '../types';
+import {
+  ContractDefinition,
+  ContractOperation,
+  HttpMethod,
+  RequestByContentType,
+  ResponseByContentType,
+} from '../types';
 import { OpenAPIV3_1 } from './types';
 import { extractSchema } from './vendors';
+
+/**
+ * Schema registry for deduplication and reference management
+ */
+type SchemaRegistry = {
+  schemas: Record<string, OpenAPIV3_1.SchemaObject>;
+  schemaIds: Map<StandardSchemaV1, string>;
+  nextId: number;
+};
 
 /**
  * Options for the OpenAPI specification generator
@@ -31,40 +46,32 @@ export const createOpenApiSpecification = (
 
   return {
     openapi: '3.1.1',
-    info: {
-      title: options.title,
-      version: options.version,
-      description: options.description,
-      termsOfService: options.termsOfService,
-      contact: options.contact,
-      license: options.license,
-      summary: options.summary,
-    },
+    info: createOpenApiInfo(options),
     servers: options.servers,
-    components: {
-      schemas: registry.schemas,
-    },
+    components: createOpenApiComponents(contract, registry),
     paths: createOpenApiPaths(contract, registry),
   };
 };
 
-/**
- * Schema registry for deduplication and reference management
- */
-type SchemaRegistry = {
-  schemas: Record<string, OpenAPIV3_1.SchemaObject>;
-  schemaIds: Map<StandardSchemaV1, string>;
-  nextId: number;
+export const createOpenApiInfo = (options: OpenApiSpecificationOptions): OpenAPIV3_1.InfoObject => {
+  return {
+    title: options.title,
+    version: options.version,
+    description: options.description,
+    termsOfService: options.termsOfService,
+    contact: options.contact,
+    license: options.license,
+    summary: options.summary,
+  };
 };
 
 /**
  * Creates the OpenAPI components
  */
 export const createOpenApiComponents = (
-  contract: ContractDefinition
+  contract: ContractDefinition,
+  registry: SchemaRegistry
 ): OpenAPIV3_1.ComponentsObject => {
-  const registry = createSchemaRegistry();
-  collectSchemasFromContract(contract, registry);
   return {
     schemas: registry.schemas,
   };
@@ -94,6 +101,279 @@ function extractPathParamNames(path: string): string[] {
  */
 function convertPathToOpenAPIFormat(path: string): string {
   return path.replace(/:([^/]+)/g, '{$1}');
+}
+
+/**
+ * Sanitize content type string for use in schema names
+ * Removes non-alphanumeric characters
+ */
+function sanitizeContentType(contentType: string): string {
+  return contentType.replace(/[^a-zA-Z0-9]/g, '');
+}
+
+/**
+ * Type guard to validate request/response schema objects
+ */
+function isValidBodySchema(
+  schema: unknown
+): schema is { body?: StandardSchemaV1; headers?: StandardSchemaV1 } {
+  return Boolean(schema && typeof schema === 'object' && 'body' in schema);
+}
+
+/**
+ * Generic helper to process content-type maps
+ */
+function processContentTypeMap(
+  contentMap: Record<string, unknown>,
+  processor: (
+    contentType: string,
+    schema: { body?: StandardSchemaV1; headers?: StandardSchemaV1 }
+  ) => void
+): void {
+  for (const [contentType, schema] of Object.entries(contentMap)) {
+    if (isValidBodySchema(schema)) {
+      processor(contentType, schema);
+    }
+  }
+}
+
+/**
+ * Create a schema reference object
+ */
+function createSchemaRef(schemaId: string): OpenAPIV3_1.ReferenceObject {
+  return {
+    $ref: `#/components/schemas/${schemaId}`,
+  };
+}
+
+/**
+ * Create a media type object with a schema reference
+ */
+function createMediaTypeObject(schemaId: string | null): OpenAPIV3_1.MediaTypeObject | undefined {
+  if (!schemaId) {
+    return undefined;
+  }
+  return {
+    schema: createSchemaRef(schemaId),
+  };
+}
+
+/**
+ * Create a parameter object from a schema property
+ */
+function createParameterFromProperty(
+  name: string,
+  paramSchema: OpenAPIV3_1.SchemaObject,
+  location: 'query' | 'header' | 'path',
+  required: boolean
+): OpenAPIV3_1.ParameterObject {
+  return {
+    name,
+    in: location,
+    required,
+    schema: paramSchema,
+    description: paramSchema.description,
+  };
+}
+
+/**
+ * Create parameters from a schema's properties
+ */
+function createParametersFromSchema(
+  schema: OpenAPIV3_1.SchemaObject,
+  location: 'query' | 'header' | 'path',
+  requiredByDefault: boolean = false
+): OpenAPIV3_1.ParameterObject[] {
+  if (!schema.properties || typeof schema.properties !== 'object') {
+    return [];
+  }
+
+  const requiredFields = schema.required || [];
+  const parameters: OpenAPIV3_1.ParameterObject[] = [];
+
+  for (const [paramName, paramSchema] of Object.entries(schema.properties)) {
+    const isRequired = requiredByDefault || requiredFields.includes(paramName);
+    parameters.push(
+      createParameterFromProperty(
+        paramName,
+        paramSchema as OpenAPIV3_1.SchemaObject,
+        location,
+        isRequired
+      )
+    );
+  }
+
+  return parameters;
+}
+
+/**
+ * Get schema property by name, with fallback
+ */
+function getSchemaProperty(
+  schema: OpenAPIV3_1.SchemaObject | null,
+  propertyName: string,
+  fallback: OpenAPIV3_1.SchemaObject
+): OpenAPIV3_1.SchemaObject {
+  if (!schema?.properties || typeof schema.properties !== 'object') {
+    return fallback;
+  }
+
+  const propSchema = schema.properties[propertyName];
+  if (propSchema) {
+    return propSchema as OpenAPIV3_1.SchemaObject;
+  }
+
+  return fallback;
+}
+
+/**
+ * Create path parameters from path string and optional schema
+ */
+function createPathParameters(
+  path: string,
+  pathParamsSchema: StandardSchemaV1 | undefined
+): OpenAPIV3_1.ParameterObject[] {
+  const pathParamNames = extractPathParamNames(path);
+  if (pathParamNames.length === 0) {
+    return [];
+  }
+
+  const extractedSchema = pathParamsSchema ? extractSchema(pathParamsSchema) : null;
+  const parameters: OpenAPIV3_1.ParameterObject[] = [];
+
+  for (const paramName of pathParamNames) {
+    const paramSchema = getSchemaProperty(extractedSchema, paramName, { type: 'string' });
+    parameters.push(createParameterFromProperty(paramName, paramSchema, 'path', true));
+  }
+
+  return parameters;
+}
+
+/**
+ * Process request body content-type map and create OpenAPI content object
+ */
+function createRequestBodyContent(
+  requests: RequestByContentType,
+  registry: SchemaRegistry,
+  operationId: string
+): Record<string, OpenAPIV3_1.MediaTypeObject> {
+  const content: Record<string, OpenAPIV3_1.MediaTypeObject> = {};
+
+  processContentTypeMap(requests, (contentType, schema) => {
+    if (schema.body) {
+      const bodySchemaId = getOrCreateSchemaReference(
+        schema.body,
+        registry,
+        `${operationId}Request${sanitizeContentType(contentType)}Body`
+      );
+      const mediaTypeObj = createMediaTypeObject(bodySchemaId);
+      if (mediaTypeObj) {
+        content[contentType] = mediaTypeObj;
+      }
+    }
+  });
+
+  return content;
+}
+
+/**
+ * Process response content-type map and create OpenAPI content object and headers
+ */
+function createResponseContent(
+  responseByContentType: ResponseByContentType,
+  registry: SchemaRegistry,
+  operationId: string,
+  statusCode: string
+): {
+  content: Record<string, OpenAPIV3_1.MediaTypeObject>;
+  headers: Record<string, OpenAPIV3_1.HeaderObject>;
+} {
+  const content: Record<string, OpenAPIV3_1.MediaTypeObject> = {};
+  const allHeaders: Record<string, OpenAPIV3_1.HeaderObject> = {};
+
+  processContentTypeMap(responseByContentType, (contentType, schema) => {
+    const mediaTypeObj: OpenAPIV3_1.MediaTypeObject = {};
+    const responseSchema = schema as { body?: StandardSchemaV1; headers?: StandardSchemaV1 };
+
+    // Response body schema
+    if (responseSchema.body) {
+      const bodySchemaId = getOrCreateSchemaReference(
+        responseSchema.body,
+        registry,
+        `${operationId}Response${statusCode}${sanitizeContentType(contentType)}Body`
+      );
+      const mediaTypeWithSchema = createMediaTypeObject(bodySchemaId);
+      if (mediaTypeWithSchema?.schema) {
+        mediaTypeObj.schema = mediaTypeWithSchema.schema;
+      }
+    }
+
+    // Response headers schema (per content type) - inline directly
+    if (responseSchema.headers) {
+      const headersSchema = extractSchema(responseSchema.headers);
+      if (headersSchema.properties) {
+        // Headers are shared across all content types in OpenAPI, so we merge them
+        for (const [headerName, headerSchema] of Object.entries(headersSchema.properties)) {
+          allHeaders[headerName] = {
+            schema: headerSchema as OpenAPIV3_1.SchemaObject,
+            description: (headerSchema as OpenAPIV3_1.SchemaObject).description,
+          };
+        }
+      }
+    }
+
+    content[contentType] = mediaTypeObj;
+  });
+
+  return { content, headers: allHeaders };
+}
+
+/**
+ * Collect body schemas from a content-type map
+ */
+function collectBodySchemas(
+  contentMap: Record<string, unknown>,
+  registry: SchemaRegistry,
+  schemaNamePrefix: string
+): void {
+  processContentTypeMap(contentMap, (contentType, schema) => {
+    if (schema.body) {
+      getOrCreateSchemaReference(
+        schema.body,
+        registry,
+        `${schemaNamePrefix}${sanitizeContentType(contentType)}Body`
+      );
+    }
+  });
+}
+
+/**
+ * Collect body schema from request content-type map
+ */
+function collectRequestBodySchemas(
+  requests: RequestByContentType,
+  registry: SchemaRegistry,
+  operationId: string
+): void {
+  collectBodySchemas(requests, registry, `${operationId}Request`);
+}
+
+/**
+ * Collect body schemas from response content-type map
+ */
+function collectResponseBodySchemas(
+  responses: Record<string | number, ResponseByContentType | undefined>,
+  registry: SchemaRegistry,
+  operationId: string
+): void {
+  for (const [statusCode, response] of Object.entries(responses)) {
+    if (!response || typeof response !== 'object') continue;
+    collectBodySchemas(
+      response as ResponseByContentType,
+      registry,
+      `${operationId}Response${statusCode}`
+    );
+  }
 }
 
 /**
@@ -164,47 +444,14 @@ function collectSchemasFromOperation(
   registry: SchemaRegistry,
   operationId: string
 ): void {
-  // Path parameters
-  if (operation.pathParams) {
-    getOrCreateSchemaReference(operation.pathParams, registry, `${operationId}PathParams`);
+  // Request body - only supports content-type map format
+  if (operation.requests) {
+    collectRequestBodySchemas(operation.requests as RequestByContentType, registry, operationId);
   }
 
-  // Query parameters
-  if (operation.query) {
-    getOrCreateSchemaReference(operation.query, registry, `${operationId}Query`);
-  }
-
-  // Request body
-  if (operation.request) {
-    getOrCreateSchemaReference(operation.request, registry, `${operationId}Request`);
-  }
-
-  // Request headers
-  if (operation.headers) {
-    getOrCreateSchemaReference(operation.headers, registry, `${operationId}Headers`);
-  }
-
-  // Response schemas
+  // Response body schemas only (headers, path params, and query params are inlined)
   if (operation.responses) {
-    for (const [statusCode, response] of Object.entries(operation.responses)) {
-      if (response && typeof response === 'object' && 'body' in response) {
-        const responseSchema = response as ResponseSchema;
-        if (responseSchema.body) {
-          getOrCreateSchemaReference(
-            responseSchema.body,
-            registry,
-            `${operationId}Response${statusCode}Body`
-          );
-        }
-        if (responseSchema.headers) {
-          getOrCreateSchemaReference(
-            responseSchema.headers,
-            registry,
-            `${operationId}Response${statusCode}Headers`
-          );
-        }
-      }
-    }
+    collectResponseBodySchemas(operation.responses, registry, operationId);
   }
 }
 
@@ -235,7 +482,7 @@ export const createOpenApiPaths = (
       paths[openApiPath] = {};
     }
     const pathItem = paths[openApiPath]!;
-    const method = (operation.method || 'GET').toLowerCase() as HttpMethod;
+    const method = operation.method.toLowerCase() as HttpMethod;
     pathItem[method] = createOpenApiOperation(operation, registry, operationId);
   }
   return paths;
@@ -256,127 +503,43 @@ function createOpenApiOperation(
     tags: operation.tags,
   };
 
-  // Collect parameters (path params and query params)
+  // Collect parameters (path params, query params, and headers)
   const parameters: OpenAPIV3_1.ParameterObject[] = [];
 
-  // Path parameters - extract from path string first
-  const pathParamNames = extractPathParamNames(operation.path);
-
-  if (pathParamNames.length > 0) {
-    // If pathParams schema exists, use it to get schemas for each param
-    let pathParamsSchema: OpenAPIV3_1.SchemaObject | null = null;
-    if (operation.pathParams) {
-      const schemaId = getOrCreateSchemaReference(
-        operation.pathParams,
-        registry,
-        `${operationId}PathParams`
-      );
-      if (schemaId && registry.schemas[schemaId]) {
-        pathParamsSchema = registry.schemas[schemaId];
-      }
-    }
-
-    // Create path parameters for each param found in the path
-    for (const paramName of pathParamNames) {
-      let paramSchema: OpenAPIV3_1.SchemaObject;
-      let description: string | undefined;
-
-      // Try to get schema from pathParams schema if available
-      if (pathParamsSchema?.properties && typeof pathParamsSchema.properties === 'object') {
-        const propSchema = pathParamsSchema.properties[paramName];
-        if (propSchema) {
-          paramSchema = propSchema as OpenAPIV3_1.SchemaObject;
-          description = paramSchema.description;
-        } else {
-          // Param not found in schema, fallback to string
-          paramSchema = { type: 'string' };
-        }
-      } else {
-        // No schema provided, default to string
-        paramSchema = { type: 'string' };
-      }
-
-      parameters.push({
-        name: paramName,
-        in: 'path',
-        required: true, // Path parameters are always required
-        schema: paramSchema,
-        description,
-      });
-    }
-  }
+  // Path parameters
+  const pathParams = createPathParameters(operation.path, operation.pathParams);
+  parameters.push(...pathParams);
 
   // Query parameters
   if (operation.query) {
-    const schemaId = getOrCreateSchemaReference(operation.query, registry, `${operationId}Query`);
-    if (schemaId && registry.schemas[schemaId]) {
-      const schema = registry.schemas[schemaId];
-      // Extract properties from schema and create query parameters
-      if (schema.properties) {
-        const requiredFields = schema.required || [];
-        for (const [paramName, paramSchema] of Object.entries(schema.properties)) {
-          parameters.push({
-            name: paramName,
-            in: 'query',
-            required: requiredFields.includes(paramName),
-            schema: paramSchema as OpenAPIV3_1.SchemaObject,
-            description: (paramSchema as OpenAPIV3_1.SchemaObject).description,
-          });
-        }
-      }
-    }
+    const schema = extractSchema(operation.query);
+    const queryParams = createParametersFromSchema(schema, 'query');
+    parameters.push(...queryParams);
+  }
+
+  // Request headers
+  if (operation.headers) {
+    const schema = extractSchema(operation.headers);
+    const headerParams = createParametersFromSchema(schema, 'header');
+    parameters.push(...headerParams);
   }
 
   if (parameters.length > 0) {
     operationObj.parameters = parameters;
   }
 
-  // Request body
-  if (operation.request) {
-    const schemaId = getOrCreateSchemaReference(
-      operation.request,
+  // Request body - only supports content-type map format
+  if (operation.requests) {
+    const content = createRequestBodyContent(
+      operation.requests as RequestByContentType,
       registry,
-      `${operationId}Request`
+      operationId
     );
-    if (schemaId) {
-      operationObj.requestBody = {
-        content: {
-          'application/json': {
-            schema: {
-              $ref: `#/components/schemas/${schemaId}`,
-            },
-          },
-        },
-      };
-    }
-  }
 
-  // Request headers (OpenAPI doesn't have a standard way to document headers in requestBody,
-  // but we can add them as parameters with in: 'header')
-  if (operation.headers) {
-    const schemaId = getOrCreateSchemaReference(
-      operation.headers,
-      registry,
-      `${operationId}Headers`
-    );
-    if (schemaId && registry.schemas[schemaId]) {
-      const schema = registry.schemas[schemaId];
-      if (schema.properties) {
-        const headerParams: OpenAPIV3_1.ParameterObject[] = [];
-        const requiredFields = schema.required || [];
-        for (const [headerName, headerSchema] of Object.entries(schema.properties)) {
-          headerParams.push({
-            name: headerName,
-            in: 'header',
-            required: requiredFields.includes(headerName),
-            schema: headerSchema as OpenAPIV3_1.SchemaObject,
-            description: (headerSchema as OpenAPIV3_1.SchemaObject).description,
-          });
-        }
-        if (headerParams.length > 0) {
-          operationObj.parameters = [...(operationObj.parameters || []), ...headerParams];
-        }
-      }
+    if (Object.keys(content).length > 0) {
+      operationObj.requestBody = {
+        content,
+      };
     }
   }
 
@@ -384,53 +547,29 @@ function createOpenApiOperation(
   if (operation.responses) {
     const responses: OpenAPIV3_1.ResponsesObject = {};
     for (const [statusCode, response] of Object.entries(operation.responses)) {
-      if (response && typeof response === 'object' && 'body' in response) {
-        const responseSchema = response as ResponseSchema;
-        const responseObj: OpenAPIV3_1.ResponseObject = {
-          description: '', // Default description, could be enhanced
-        };
+      if (!response || typeof response !== 'object') continue;
 
-        // Response body
-        if (responseSchema.body) {
-          const bodySchemaId = getOrCreateSchemaReference(
-            responseSchema.body,
-            registry,
-            `${operationId}Response${statusCode}Body`
-          );
-          if (bodySchemaId) {
-            responseObj.content = {
-              'application/json': {
-                schema: {
-                  $ref: `#/components/schemas/${bodySchemaId}`,
-                },
-              },
-            };
-          }
-        }
+      const responseByContentType = response as ResponseByContentType;
+      const { content, headers } = createResponseContent(
+        responseByContentType,
+        registry,
+        operationId,
+        statusCode
+      );
 
-        // Response headers
-        if (responseSchema.headers) {
-          const headersSchemaId = getOrCreateSchemaReference(
-            responseSchema.headers,
-            registry,
-            `${operationId}Response${statusCode}Headers`
-          );
-          if (headersSchemaId && registry.schemas[headersSchemaId]) {
-            const headersSchema = registry.schemas[headersSchemaId];
-            if (headersSchema.properties) {
-              responseObj.headers = {};
-              for (const [headerName, headerSchema] of Object.entries(headersSchema.properties)) {
-                responseObj.headers[headerName] = {
-                  schema: headerSchema as OpenAPIV3_1.SchemaObject,
-                  description: (headerSchema as OpenAPIV3_1.SchemaObject).description,
-                };
-              }
-            }
-          }
-        }
+      const responseObj: OpenAPIV3_1.ResponseObject = {
+        description: '', // Default description, could be enhanced
+      };
 
-        responses[statusCode] = responseObj;
+      if (Object.keys(content).length > 0) {
+        responseObj.content = content;
       }
+
+      if (Object.keys(headers).length > 0) {
+        responseObj.headers = headers;
+      }
+
+      responses[statusCode] = responseObj;
     }
     operationObj.responses = responses;
   }

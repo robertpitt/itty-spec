@@ -52,6 +52,7 @@ const ListUsersResponse = z.object({
 const contract = createContract({
   getUsers: {
     path: '/users',
+    method: 'GET',
     headers: z.object({
       'x-api-key': z.string(),
     }),
@@ -60,7 +61,9 @@ const contract = createContract({
       limit: z.number().min(1).max(100).default(10),
     }),
     responses: {
-      200: { body: ListUsersResponse },
+      200: {
+        'application/json': { body: ListUsersResponse },
+      },
     },
   },
   createUser: {
@@ -69,12 +72,20 @@ const contract = createContract({
     headers: z.object({
       'x-api-key': z.string(),
     }),
-    body: CreateUserRequest,
-    response: {
-      200: { body: UserEntity },
-      400: { body: z.object({ error: z.string() }) },
-    }
-  }
+    requests: {
+      'application/json': {
+        body: CreateUserRequest,
+      },
+    },
+    responses: {
+      200: {
+        'application/json': { body: UserEntity },
+      },
+      400: {
+        'application/json': { body: z.object({ error: z.string() }) },
+      },
+    },
+  },
 });
 ```
 
@@ -89,18 +100,26 @@ const router = createRouter({
   contract,
   handlers: {
     getUsers: async (request) => {
-      // request.query is fully typed and validated!
-      const { page, limit } = request.query;
+      // request.validatedQuery is fully typed and validated!
+      const { page, limit } = request.validatedQuery;
 
-      // Return typed response
-      return request.json({ users: [], total: 0 });
+      // Return typed response using request.respond()
+      return request.respond({
+        status: 200,
+        contentType: 'application/json',
+        body: { users: [], total: 0 },
+      });
     },
     createUser: async (request) => {
-      // request.body is fully typed and validated!
-      const { name, email } = request.body;
+      // request.validatedBody is fully typed and validated!
+      const { name, email } = request.validatedBody;
 
       // TypeScript ensures you return a valid response
-      return request.json({ id: '123', name }, 201);
+      return request.respond({
+        status: 200,
+        contentType: 'application/json',
+        body: { id: '123', name, email },
+      });
     },
   },
 });
@@ -170,9 +189,10 @@ const router = createRouter({
     <elements-api apiDescriptionDocument='${JSON.stringify(openApiSpec)}' router="hash" layout="sidebar" />
   </body>
 </html>`;
-      return new Response(html, {
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      return request.respond({
         status: 200,
+        contentType: 'text/html',
+        body: html,
       });
     },
   },

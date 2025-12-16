@@ -11,7 +11,7 @@ test('createContract should return contract definition as-is', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
   };
@@ -29,7 +29,7 @@ test('createContract should preserve type inference', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
   });
@@ -46,7 +46,7 @@ test('createContract should handle multiple operations', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
     getUser: {
@@ -54,8 +54,8 @@ test('createContract should handle multiple operations', () => {
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { body: z.object({ user: z.string() }) },
-        404: { body: z.object({ error: z.string() }) },
+        200: { 'application/json': { body: z.object({ user: z.string() }) } },
+        404: { 'application/json': { body: z.object({ error: z.string() }) } },
       },
     },
   });
@@ -72,7 +72,7 @@ test('createRouter should create router with contract and handlers', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
   });
@@ -81,7 +81,11 @@ test('createRouter should create router with contract and handlers', () => {
     contract,
     handlers: {
       getUsers: async (request) => {
-        return request.json({ users: [] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: [] },
+        });
       },
     },
   });
@@ -97,7 +101,7 @@ test('createRouter should handle missing routes with default 404', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
   });
@@ -106,7 +110,11 @@ test('createRouter should handle missing routes with default 404', async () => {
     contract,
     handlers: {
       getUsers: async (request) => {
-        return request.json({ users: [] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: [] },
+        });
       },
     },
   });
@@ -124,7 +132,7 @@ test('createRouter should use custom missing handler', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
   });
@@ -133,11 +141,18 @@ test('createRouter should use custom missing handler', async () => {
     contract,
     handlers: {
       getUsers: async (request) => {
-        return request.json({ users: [] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: [] },
+        });
       },
     },
     missing: async (request) => {
-      return request.json({ error: 'Not found' }, 404);
+      return new Response(JSON.stringify({ error: 'Not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' },
+      });
     },
   });
 
@@ -156,7 +171,7 @@ test('createRouter should handle base path', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
   });
@@ -165,7 +180,11 @@ test('createRouter should handle base path', () => {
     contract,
     handlers: {
       getUsers: async (request) => {
-        return request.json({ users: [] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: [] },
+        });
       },
     },
     base: '/api/v1',
@@ -181,7 +200,7 @@ test('createRouter should skip operations without handlers', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { body: z.object({ users: z.array(z.string()) }) },
+        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
       },
     },
     getUser: {
@@ -189,7 +208,7 @@ test('createRouter should skip operations without handlers', () => {
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { body: z.object({ user: z.string() }) },
+        200: { 'application/json': { body: z.object({ user: z.string() }) } },
       },
     },
   });
@@ -198,7 +217,11 @@ test('createRouter should skip operations without handlers', () => {
     contract,
     handlers: {
       getUsers: async (request) => {
-        return request.json({ users: [] }, 200);
+        return request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: { users: [] },
+        });
       },
       // getUser handler is missing
     },
