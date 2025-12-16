@@ -1,18 +1,35 @@
 # itty-spec
 
-> Type-safe API contracts for [itty-router](https://github.com/kwhitley/itty-router)
+Contract-first, type-safe API definitions for itty-router.
 
-`itty-spec` provides a type-safe, "contract first" based approach to building APIs with itty-router. Define your API contracts using standard schemas, and get automatic request/response validation with full TypeScript type inference.
+`itty-spec` is a small layer on top of itty-router that turns an API contract into:
 
-## Features
+- A ready-to-export `fetch` handler
+- Automatic request parsing and validation (params, query, headers, body)
+- Fully inferred TypeScript types in your route handlers
+- Typed, contract-checked responses (status code + content type + body)
+- Optional OpenAPI 3.1 spec generation from the same contract (Zod v4 supported)
 
-- 🔒 **Type-safe contracts** - Define API contracts with Zod/Valibot/etc and get full TypeScript inference
-- ✅ **Automatic validation** - Request and response validation happens automatically
-- 🎯 **Zero boilerplate** - Contracts define routes, validation, and types in one place
-- 🚀 **Edge-compatible** - Built on itty-router, works everywhere (Cloudflare Workers, Node.js, Bun, etc.)
-- 📝 **Rich schema support** - Path params, query params, headers, body, and typed responses
-- 🛡️ **Type-safe handlers** - Handlers receive fully typed requests with validated data
-- 📚 **OpenAPI generation** - Automatically convert contracts to OpenAPI 3.1 specifications (Zod supported)
+If you like itty-router’s “tiny router for Fetch” mental model, `itty-spec` keeps that model and adds a single source of truth: the contract.
+
+---
+
+## What this project provides
+
+- **Contract-first API design**: define routes, inputs, and outputs once.
+- **Runtime validation**: invalid requests are rejected before your handler runs.
+- **End-to-end TypeScript inference**: handlers receive typed, validated data.
+- **Typed response builder**: responses must match the contract (status/content-type/body).
+- **Fetch-first compatibility**: works in any environment that supports the Fetch API.
+- **OpenAPI generation (optional)**: generate an OpenAPI 3.1 document from the contract (currently Zod v4).
+
+## What this project is not
+
+- Not a full application framework (no controllers, DI container, ORM, etc.).
+- Not a server runtime (you bring your own deployment: Workers, Node, Bun, Deno, etc.).
+- Not a replacement for itty-router; it builds on it.
+
+---
 
 ## Installation
 
@@ -20,41 +37,42 @@
 npm install itty-spec
 # or
 pnpm add itty-spec
-```
+````
 
-## Quick Start
+---
 
-1. First we define a contract that describes your api endpoints (example with zod)
+## Quick start
 
-```typescript
-import { createContract } from 'itty-spec';
-import { z } from 'zod';
+### 1) Define a contract
+
+```ts
+import { createContract } from "itty-spec";
+import { z } from "zod";
 
 const UserEntity = z.object({
   id: z.uuid(),
   name: z.string().min(1),
   email: z.string().email(),
   age: z.number().min(18).optional(),
-})
+});
 
 const CreateUserRequest = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   age: z.number().min(18).optional(),
-})
+});
 
 const ListUsersResponse = z.object({
   users: z.array(UserEntity),
-  total: z.number()
-})
+  total: z.number(),
+});
 
-// Define your API contract
-const contract = createContract({
+export const contract = createContract({
   getUsers: {
-    path: '/users',
-    method: 'GET',
+    path: "/users",
+    method: "GET",
     headers: z.object({
-      'x-api-key': z.string(),
+      "x-api-key": z.string(),
     }),
     query: z.object({
       page: z.number().min(1).default(1),
@@ -62,182 +80,137 @@ const contract = createContract({
     }),
     responses: {
       200: {
-        'application/json': { body: ListUsersResponse },
+        "application/json": { body: ListUsersResponse },
       },
     },
   },
+
   createUser: {
-    path: '/users',
-    method: 'POST',
+    path: "/users",
+    method: "POST",
     headers: z.object({
-      'x-api-key': z.string(),
+      "x-api-key": z.string(),
     }),
     requests: {
-      'application/json': {
+      "application/json": {
         body: CreateUserRequest,
       },
     },
     responses: {
       200: {
-        'application/json': { body: UserEntity },
+        "application/json": { body: UserEntity },
       },
       400: {
-        'application/json': { body: z.object({ error: z.string() }) },
+        "application/json": { body: z.object({ error: z.string() }) },
       },
     },
   },
 });
 ```
 
-2. Next we can create a router that provides an implementation for the contract
+### 2) Implement the contract with a router
 
-```typescript
-import { createRouter  } from 'itty-spec';
-import { contract } from "./contract"
+```ts
+import { createRouter } from "itty-spec";
+import { contract } from "./contract";
 
-// Create a router with type-safe handlers
 const router = createRouter({
   contract,
   handlers: {
     getUsers: async (request) => {
-      // request.validatedQuery is fully typed and validated!
       const { page, limit } = request.validatedQuery;
 
-      // Return typed response using request.respond()
       return request.respond({
         status: 200,
-        contentType: 'application/json',
+        contentType: "application/json",
         body: { users: [], total: 0 },
       });
     },
+
     createUser: async (request) => {
-      // request.validatedBody is fully typed and validated!
       const { name, email } = request.validatedBody;
 
-      // TypeScript ensures you return a valid response
       return request.respond({
         status: 200,
-        contentType: 'application/json',
-        body: { id: '123', name, email },
+        contentType: "application/json",
+        body: { id: "123", name, email },
       });
     },
   },
 });
 
-// Use with any fetch-compatible environment
 export default {
   fetch: router.fetch,
 };
 ```
 
-## OpenAPI Specification Generation
+---
 
-`itty-spec` can automatically generate OpenAPI 3.1 specifications from your contracts. This is perfect for:
-- API documentation
-- Client SDK generation
-- API testing tools
-- Sharing API contracts with frontend teams
+## Core concepts
 
-### Basic Usage
+### Contract
 
-```typescript
-import { createOpenApiSpecification } from 'itty-spec/openapi';
-import { contract } from './contract';
+A contract is a plain object describing each operation:
 
-// Generate OpenAPI specification from your contract
+* `method` and `path`
+* optional schemas for `path params`, `query`, `headers`, and request bodies
+* allowed `responses` keyed by status code and content type
+
+The contract drives both runtime behavior (validation + routing) and compile-time types.
+
+### Router
+
+`createRouter({ contract, handlers })` binds your handlers to the contract and produces a Fetch handler (`router.fetch`).
+
+Before a handler is called, `itty-spec` validates the incoming request according to the schemas you provided. Your handler receives a request object with typed, validated data (for example `request.validatedQuery` and `request.validatedBody`).
+
+### Responses
+
+Handlers return responses via `request.respond({ status, contentType, body })`.
+
+The shape of that response is type-checked against the contract for the current operation, so returning the wrong status code, content type, or body shape becomes a TypeScript error.
+
+---
+
+## Schema support
+
+`itty-spec` is designed to work with schema libraries that implement the Standard Schema V1 interface. In practice:
+
+* Zod (v4) is supported and is the best experience today (including OpenAPI generation).
+* Other Standard Schema compatible libraries can be used for validation; OpenAPI support may vary.
+
+---
+
+## OpenAPI 3.1 generation (optional)
+
+If you want a formal API spec (documentation, SDK generation, Postman/Insomnia import), generate an OpenAPI document directly from your contract:
+
+```ts
+import { createOpenApiSpecification } from "itty-spec/openapi";
+import { contract } from "./contract";
+
 const openApiSpec = createOpenApiSpecification(contract, {
-  title: 'My API',
-  version: '1.0.0',
-  description: 'A comprehensive API for managing resources',
-  servers: [
-    { url: 'https://api.example.com', description: 'Production' },
-    { url: 'https://staging-api.example.com', description: 'Staging' },
-  ],
+  title: "My API",
+  version: "1.0.0",
+  description: "Example API built with itty-spec",
+  servers: [{ url: "https://api.example.com", description: "Production" }],
 });
 
-// Use the spec for documentation, client generation, etc.
 console.log(JSON.stringify(openApiSpec, null, 2));
 ```
 
-### Serving Documentation
+OpenAPI generation currently supports Zod v4 schemas via `toJSONSchema()`.
 
-You can serve interactive API documentation using the generated OpenAPI spec:
 
-```typescript
-import { createOpenApiSpecification } from 'itty-spec/openapi';
-import { createRouter } from 'itty-spec';
+## Repository layout
 
-const openApiSpec = createOpenApiSpecification(contract, {
-  title: 'My API',
-  version: '1.0.0',
-});
+* `src/` library source
+* `examples/` usage examples
+* `tests/` test suite
 
-const router = createRouter({
-  contract,
-  handlers: {
-    // Serve interactive documentation (using Stoplight Elements)
-    getDocs: async (request) => {
-      const html = `
-<!doctype html>
-<html>
-  <head>
-    <title>API Documentation</title>
-    <script src="https://unpkg.com/@stoplight/elements/web-components.min.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/@stoplight/elements/styles.min.css">
-  </head>
-  <body>
-    <elements-api apiDescriptionDocument='${JSON.stringify(openApiSpec)}' router="hash" layout="sidebar" />
-  </body>
-</html>`;
-      return request.respond({
-        status: 200,
-        contentType: 'text/html',
-        body: html,
-      });
-    },
-  },
-});
-```
+## References
 
-### Schema Support
-
-Currently, OpenAPI generation supports:
-- ✅ **Zod** - Full support for Zod v4 schemas with `toJSONSchema()` method
-
-Support for additional schema libraries (Valibot, ArkType, etc.) is planned for future releases.
-
-## Development
-
-### Prerequisites
-
-- Node.js 18+
-- npm or pnpm
-
-### Setup
-
-```bash
-npm install
-```
-
-### Build
-
-Build the library:
-
-```bash
-npm run build
-```
-
-### Testing
-
-```bash
-npm test
-```
-
-### Formatting
-
-```bash
-npm run format
-```
+- [itty-router](https://itty.dev/itty-router)
 
 ## License
 
