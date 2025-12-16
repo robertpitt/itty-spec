@@ -2,10 +2,42 @@ import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { OpenAPIV3_1 } from './types';
 import { createRequire } from 'module';
 
+// ============================================================================
+// Types and Interfaces
+// ============================================================================
+
+/**
+ * Configuration for a vendor schema extractor
+ *
+ * Defines how to load and use a vendor's module to extract JSON Schema
+ * from StandardSchemaV1 schemas.
+ */
+type VendorConfig = {
+  /** Vendor name (e.g., 'zod', 'valibot') */
+  name: string;
+  /** Ordered list of module paths to try (with fallbacks) */
+  modulePaths: string[];
+  /** Validate that the loaded module has required methods/functions */
+  validateModule: (module: any) => boolean;
+  /** Extract JSON Schema from a StandardSchemaV1 schema using the vendor module */
+  extract: (module: any, schema: StandardSchemaV1) => any;
+  /** Error messages for different failure scenarios */
+  errorMessages: {
+    /** Error when module cannot be found */
+    notFound: string;
+    /** Error when module is found but doesn't have required methods */
+    invalid: string;
+  };
+};
+
 /**
  * Type for schema extraction functions
  */
 type SchemaExtractor = (schema: StandardSchemaV1) => OpenAPIV3_1.SchemaObject;
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
 /**
  * Get a require function that works in both CommonJS and ES module environments
@@ -20,128 +52,78 @@ function getRequire(): NodeRequire {
 }
 
 /**
- * Get zod module dynamically, trying multiple import strategies
+ * Load a vendor module dynamically using the provided configuration
  *
- * Uses string-based require to prevent bundlers from statically analyzing and bundling zod.
+ * Uses string concatenation to prevent bundlers from statically analyzing
+ * and bundling vendor modules. Tries each module path in order until one
+ * successfully loads and validates.
  *
- * @throws Error if zod cannot be loaded or doesn't have toJSONSchema method
+ * @param config Vendor configuration defining module paths and validation
+ * @returns The loaded and validated vendor module
+ * @throws Error if module cannot be loaded or doesn't meet validation requirements
  */
-function getZodModule(): any {
-  // Use string concatenation to prevent static analysis by bundlers
-  const zodV4Path = 'zod' + '/v4';
-  const zodPath = 'zod';
+function loadVendorModule(config: VendorConfig): any {
+  const require = getRequire();
 
-  try {
-    const require = getRequire();
-
-    // Try zod/v4 first (zod v4) - using dynamic path to prevent bundling
+  // Try each module path in order
+  for (const modulePath of config.modulePaths) {
     try {
-      const zodV4 = require(zodV4Path);
-      if (zodV4 && typeof zodV4.toJSONSchema === 'function') {
-        return zodV4;
+      // Use string concatenation to prevent static analysis by bundlers
+      // Split path and reconstruct to prevent bundler static analysis
+      const pathParts = modulePath.split('/');
+      const dynamicPath =
+        pathParts.length > 1
+          ? pathParts.reduce((acc, part) => (acc ? acc + '/' + part : part))
+          : modulePath;
+
+      const module = require(dynamicPath);
+
+      // Validate module has required methods
+      if (config.validateModule(module)) {
+        return module;
       }
-    } catch {
-      // Fall through to try 'zod'
+    } catch (err: any) {
+      // If module not found, continue to next path
+      if (err.code === 'MODULE_NOT_FOUND') {
+        continue;
+      }
+      // Re-throw other errors
+      throw err;
     }
-
-    // Try 'zod' (might be v3 or v4) - using dynamic path to prevent bundling
-    const zod = require(zodPath);
-    if (zod && typeof zod.toJSONSchema === 'function') {
-      return zod;
-    }
-    // If zod exists but doesn't have toJSONSchema, it's probably v3
-    throw new Error(
-      'z.toJSONSchema() is not available. Please ensure you are using zod v4 or later.'
-    );
-  } catch (err: any) {
-    if (err.code === 'MODULE_NOT_FOUND') {
-      throw new Error(
-        'Zod is required for zod schema extraction. Please install zod: npm install zod'
-      );
-    }
-    // Re-throw if it's our custom error about missing toJSONSchema
-    throw err;
   }
-}
 
-/**
- * Get @valibot/to-json-schema module dynamically
- *
- * Uses string-based require to prevent bundlers from statically analyzing and bundling the package.
- *
- * @throws Error if @valibot/to-json-schema cannot be loaded or doesn't have toJsonSchema method
- */
-function getValibotToJsonSchemaModule(): any {
-  // Use string concatenation to prevent static analysis by bundlers
-  const valibotToJsonSchemaPath = '@valibot/to-json-schema';
-
+  // If we get here, none of the paths worked
+  // Check if it's a module not found error or validation error
   try {
-    const require = getRequire();
-    const valibotToJsonSchema = require(valibotToJsonSchemaPath);
-    if (valibotToJsonSchema && typeof valibotToJsonSchema.toJsonSchema === 'function') {
-      return valibotToJsonSchema;
+    // Try the first path again to get a better error message
+    const firstPath = config.modulePaths[0];
+    const pathParts = firstPath.split('/');
+    const dynamicPath =
+      pathParts.length > 1
+        ? pathParts.reduce((acc, part) => (acc ? acc + '/' + part : part))
+        : firstPath;
+    const testModule = require(dynamicPath);
+    // If we get here, module exists but validation failed
+    if (!config.validateModule(testModule)) {
+      throw new Error(config.errorMessages.invalid);
     }
-    throw new Error(
-      'toJsonSchema() is not available from @valibot/to-json-schema. Please ensure you have the correct version installed.'
-    );
+    // Should not reach here, but if we do, throw not found
+    throw new Error(config.errorMessages.notFound);
   } catch (err: any) {
     if (err.code === 'MODULE_NOT_FOUND') {
-      throw new Error(
-        '@valibot/to-json-schema is required for valibot schema extraction. Please install it: npm install @valibot/to-json-schema'
-      );
+      throw new Error(config.errorMessages.notFound);
     }
-    // Re-throw if it's our custom error about missing toJsonSchema
+    // Re-throw validation errors
+    if (err.message === config.errorMessages.invalid) {
+      throw err;
+    }
     throw err;
   }
 }
 
-/**
- * Extract JSON Schema from a Zod schema and convert to OpenAPI SchemaObject
- *
- * Note: This function requires zod to be installed. Users must install zod when using zod schemas.
- * The function will attempt to access zod through the module system at runtime.
- */
-function extractZodSchema(schema: StandardSchemaV1): OpenAPIV3_1.SchemaObject {
-  const z = getZodModule();
-
-  // Get JSON Schema from zod using the static toJSONSchema method
-  const jsonSchema = z.toJSONSchema(schema, {
-    io: 'input',
-    target: 'openapi-3.0',
-    reused: 'ref',
-    unrepresentable: 'any',
-  });
-
-  // Convert JSON Schema to OpenAPI SchemaObject
-  return convertJsonSchemaToOpenAPI(jsonSchema);
-}
-
-/**
- * Extract JSON Schema from a Valibot schema and convert to OpenAPI SchemaObject
- *
- * Note: This function requires @valibot/to-json-schema to be installed. Users must install
- * @valibot/to-json-schema when using valibot schemas. The function will attempt to access
- * @valibot/to-json-schema through the module system at runtime.
- *
- * Note: Some Valibot transformations (like toNumber) cannot be converted to JSON Schema.
- * In such cases, errorMode: 'warn' is used to allow conversion while showing warnings,
- * and the input type will be used for OpenAPI documentation (which is correct since
- * OpenAPI should document what the API receives, not internal transformations).
- */
-function extractValibotSchema(schema: StandardSchemaV1): OpenAPIV3_1.SchemaObject {
-  const { toJsonSchema } = getValibotToJsonSchemaModule();
-
-  // Get JSON Schema from valibot using toJsonSchema
-  // Use typeMode: 'input' since we're validating input data and documenting what the API receives
-  // Use errorMode: 'warn' to allow conversion even when transformations can't be represented
-  const jsonSchema = toJsonSchema(schema, {
-    typeMode: 'input',
-    errorMode: 'warn',
-  });
-
-  // Convert JSON Schema to OpenAPI SchemaObject
-  return convertJsonSchemaToOpenAPI(jsonSchema);
-}
+// ============================================================================
+// JSON Schema to OpenAPI Conversion
+// ============================================================================
 
 /**
  * Standard OpenAPI formats that have implicit validation rules
@@ -352,19 +334,111 @@ function convertJsonSchemaToOpenAPI(jsonSchema: any): OpenAPIV3_1.SchemaObject {
   return openApiSchema;
 }
 
+// ============================================================================
+// Vendor Configurations
+// ============================================================================
+
 /**
- * Vendor registry mapping vendor names to extraction functions
+ * Zod vendor configuration
+ *
+ * Supports both zod v4 (via 'zod/v4') and regular zod imports.
+ * Requires the toJSONSchema method which is available in zod v4+.
  */
-const vendorExtractors: Record<string, SchemaExtractor> = {
-  zod: extractZodSchema,
-  valibot: extractValibotSchema,
-  // Future vendors can be added here:
-  // arktype: extractArktypeSchema,
+const zodConfig: VendorConfig = {
+  name: 'zod',
+  // Use string concatenation to prevent static analysis by bundlers
+  modulePaths: ['zod' + '/v4', 'zod'],
+  validateModule: (module: any) => {
+    return module && typeof module.toJSONSchema === 'function';
+  },
+  extract: (z: any, schema: StandardSchemaV1) => {
+    // Get JSON Schema from zod using the static toJSONSchema method
+    return z.toJSONSchema(schema, {
+      io: 'input',
+      target: 'openapi-3.0',
+      reused: 'ref',
+      unrepresentable: 'any',
+    });
+  },
+  errorMessages: {
+    notFound: 'Zod is required for zod schema extraction. Please install zod: npm install zod',
+    invalid: 'z.toJSONSchema() is not available. Please ensure you are using zod v4 or later.',
+  },
 };
 
 /**
+ * Valibot vendor configuration
+ *
+ * Requires @valibot/to-json-schema package which provides the toJsonSchema function.
+ * Uses typeMode: 'input' to document what the API receives (not internal transformations).
+ * Uses errorMode: 'warn' to allow conversion even when transformations can't be represented.
+ */
+const valibotConfig: VendorConfig = {
+  name: 'valibot',
+  modulePaths: ['@valibot/to-json-schema'],
+  validateModule: (module: any) => {
+    return module && typeof module.toJsonSchema === 'function';
+  },
+  extract: ({ toJsonSchema }: any, schema: StandardSchemaV1) => {
+    // Get JSON Schema from valibot using toJsonSchema
+    // Use typeMode: 'input' since we're validating input data and documenting what the API receives
+    // Use errorMode: 'warn' to allow conversion even when transformations can't be represented
+    return toJsonSchema(schema, {
+      typeMode: 'input',
+      errorMode: 'warn',
+    });
+  },
+  errorMessages: {
+    notFound:
+      '@valibot/to-json-schema is required for valibot schema extraction. Please install it: npm install @valibot/to-json-schema',
+    invalid:
+      'toJsonSchema() is not available from @valibot/to-json-schema. Please ensure you have the correct version installed.',
+  },
+};
+
+// ============================================================================
+// Vendor Registry
+// ============================================================================
+
+/**
+ * Create a schema extractor function from a vendor configuration
+ */
+function createExtractor(config: VendorConfig): SchemaExtractor {
+  return (schema: StandardSchemaV1): OpenAPIV3_1.SchemaObject => {
+    const module = loadVendorModule(config);
+    const jsonSchema = config.extract(module, schema);
+    return convertJsonSchemaToOpenAPI(jsonSchema);
+  };
+}
+
+/**
+ * Vendor registry mapping vendor names to extraction functions
+ *
+ * To add a new vendor:
+ * 1. Create a VendorConfig object (see zodConfig/valibotConfig examples)
+ * 2. Add it to the vendorConfigs array
+ * 3. The registry will automatically include it
+ */
+const vendorConfigs: VendorConfig[] = [zodConfig, valibotConfig];
+
+const vendorExtractors: Record<string, SchemaExtractor> = Object.fromEntries(
+  vendorConfigs.map((config) => [config.name, createExtractor(config)])
+);
+
+// ============================================================================
+// Public API
+// ============================================================================
+
+/**
  * Extract OpenAPI schema from a StandardSchemaV1 schema
- * Checks the vendor field and routes to the appropriate extractor
+ *
+ * Checks the vendor field and routes to the appropriate extractor.
+ * The extractor loads the vendor module dynamically and converts the schema
+ * to OpenAPI 3.1 format.
+ *
+ * @param schema StandardSchemaV1 compatible schema
+ * @returns OpenAPI 3.1 SchemaObject
+ * @throws Error if schema is invalid or vendor is not supported
  */
 export function extractSchema(schema: StandardSchemaV1): OpenAPIV3_1.SchemaObject {
   // Check if schema has ~standard property
