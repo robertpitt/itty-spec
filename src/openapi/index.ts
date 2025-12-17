@@ -167,12 +167,34 @@ function createParameterFromProperty(
   location: 'query' | 'header' | 'path',
   required: boolean
 ): OpenAPIV3_1.ParameterObject {
+  // Handle boolean schemas (true/false)
+  if (typeof paramSchema === 'boolean') {
+    return {
+      name,
+      in: location,
+      required,
+      schema: paramSchema,
+    };
+  }
+  
+  // Extract description from schema (use title as fallback if description is missing)
+  const description = paramSchema.description ?? paramSchema.title;
+  
+  // Create a clean schema without title (title should be at parameter level, not schema level)
+  const cleanSchema: OpenAPIV3_1.SchemaObject = typeof paramSchema === 'object' && paramSchema !== null
+    ? { ...paramSchema }
+    : paramSchema;
+  
+  if (typeof cleanSchema === 'object' && cleanSchema !== null && 'title' in cleanSchema) {
+    delete cleanSchema.title;
+  }
+  
   return {
     name,
     in: location,
     required,
-    schema: paramSchema,
-    description: paramSchema.description,
+    schema: cleanSchema,
+    description,
   };
 }
 
