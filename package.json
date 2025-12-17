@@ -1,25 +1,29 @@
 {
   "name": "itty-spec",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Type-safe contract first itty-router",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.mts",
       "require": "./dist/index.cjs",
       "import": "./dist/index.mjs"
     },
     "./contract": {
+      "types": "./dist/contract.d.mts",
       "require": "./dist/contract.cjs",
       "import": "./dist/contract.mjs"
     },
     "./openapi": {
+      "types": "./dist/openapi/index.d.mts",
       "require": "./dist/openapi/index.cjs",
       "import": "./dist/openapi/index.mjs"
     },
     "./router": {
+      "types": "./dist/router.d.mts",
       "require": "./dist/router.cjs",
       "import": "./dist/router.mjs"
     },
