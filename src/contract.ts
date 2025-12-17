@@ -28,7 +28,7 @@ import { ContractDefinition } from './types';
  * Without `as const`, path parameter extraction may fall back to `EmptyObject`
  * because template literal pattern matching only works with literal types.
  *
- * @typeParam T - The contract definition type
+ * @typeParam T - The contract definition type (must match ContractDefinition)
  * @param definition - The contract definition mapping operation IDs to operations
  * @returns The same contract definition with full type inference
  *

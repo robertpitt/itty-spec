@@ -6,8 +6,8 @@ import {
   RequestByContentType,
   ResponseByContentType,
 } from '../types';
-import { OpenAPIV3_1 } from './types';
-import { extractSchema } from './vendors';
+import type { OpenAPIV3_1 } from './types';
+import { extractSchema, extractRawJsonSchema, convertJsonSchemaToOpenAPI } from './vendors';
 
 /**
  * Schema registry for deduplication and reference management
@@ -413,7 +413,25 @@ function getOrCreateSchemaReference(
     return existingId;
   }
 
-  // Extract the schema
+  // Extract raw JSON Schema first to get definitions
+  const rawJsonSchema = extractRawJsonSchema(schema);
+
+  // Extract and register definitions if present
+  // Definitions are JSON Schema objects (not StandardSchemaV1), so we convert them directly
+  if (rawJsonSchema.definitions && typeof rawJsonSchema.definitions === 'object') {
+    for (const [defName, defSchema] of Object.entries(rawJsonSchema.definitions)) {
+      // Only register if not already registered (avoid duplicates)
+      if (!registry.schemas[defName]) {
+        // Convert definition schema (JSON Schema) to OpenAPI format
+        const openApiDefSchema = convertJsonSchemaToOpenAPI(defSchema);
+        // Register the definition schema (use the definition name as the schema ID)
+        registry.schemas[defName] = openApiDefSchema;
+      }
+    }
+  }
+
+  // Extract the main schema (definitions are already registered above)
+  // The main schema may contain $ref references to definitions, which will be converted
   const openApiSchema = extractSchema(schema);
 
   // Generate a unique ID
@@ -539,6 +557,7 @@ function createOpenApiOperation(
     if (Object.keys(content).length > 0) {
       operationObj.requestBody = {
         content,
+        required: true,
       };
     }
   }

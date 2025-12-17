@@ -175,13 +175,49 @@ export type ContractOperation<
 type AnyContractOperation = ContractOperation<any, any, any, any, any, any>;
 
 /**
+ * Valid keys for ContractOperation - explicitly listed to catch typos like 'request' vs 'requests'
+ */
+type ContractOperationKeys =
+  | 'operationId'
+  | 'description'
+  | 'summary'
+  | 'title'
+  | 'tags'
+  | 'path'
+  | 'method'
+  | 'pathParams'
+  | 'query'
+  | 'requests'
+  | 'headers'
+  | 'responses';
+
+/**
+ * Helper type that validates an operation has only valid keys.
+ * If the operation has extra keys (like 'request' instead of 'requests'),
+ * those keys are mapped to 'never', which will cause a type error.
+ *
+ * This works by intersecting the input type with a type that maps all
+ * invalid keys to 'never'. TypeScript will error when trying to assign
+ * an object with invalid keys because those keys would need to be 'never'.
+ */
+type ValidateOperation<T extends AnyContractOperation> = T & {
+  [K in Exclude<keyof T, ContractOperationKeys>]: never;
+};
+
+/**
  * Contract definition - a record of operation IDs to operations
  *
  * Uses a mapped type to preserve literal path types from the contract definition,
  * which is necessary for ExtractPathParams to work correctly.
+ *
+ * This type validates that each operation has only valid keys, rejecting extra
+ * properties like 'request' (should be 'requests') or any other invalid keys.
+ * This ensures type safety and catches typos at compile time.
  */
-export type ContractDefinition = {
-  [K in string]: AnyContractOperation;
+export type ContractDefinition<
+  T extends Record<string, AnyContractOperation> = Record<string, AnyContractOperation>,
+> = {
+  [K in keyof T]: ValidateOperation<T[K]>;
 };
 
 /**

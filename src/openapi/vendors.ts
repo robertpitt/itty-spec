@@ -147,9 +147,43 @@ const STANDARD_OPENAPI_FORMATS = new Set([
 ]);
 
 /**
+ * Convert $ref paths from JSON Schema format (#/definitions/...) to OpenAPI format (#/components/schemas/...)
+ */
+function convertRefPath(ref: string): string {
+  if (ref.startsWith('#/definitions/')) {
+    return ref.replace('#/definitions/', '#/components/schemas/');
+  }
+  return ref;
+}
+
+/**
+ * Recursively convert all $ref paths in a schema object
+ */
+function convertRefsInSchema(schema: any): any {
+  if (typeof schema !== 'object' || schema === null) {
+    return schema;
+  }
+
+  if (Array.isArray(schema)) {
+    return schema.map(convertRefsInSchema);
+  }
+
+  const converted: any = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === '$ref' && typeof value === 'string') {
+      converted[key] = convertRefPath(value);
+    } else {
+      converted[key] = convertRefsInSchema(value);
+    }
+  }
+
+  return converted;
+}
+
+/**
  * Convert JSON Schema to OpenAPI SchemaObject format
  */
-function convertJsonSchemaToOpenAPI(jsonSchema: any): OpenAPIV3_1.SchemaObject {
+export function convertJsonSchemaToOpenAPI(jsonSchema: any): OpenAPIV3_1.SchemaObject {
   // Handle boolean schemas (true/false)
   if (typeof jsonSchema === 'boolean') {
     return jsonSchema ? {} : { not: {} };
@@ -324,14 +358,13 @@ function convertJsonSchemaToOpenAPI(jsonSchema: any): OpenAPIV3_1.SchemaObject {
     openApiSchema.deprecated = jsonSchema.deprecated;
   }
 
-  // Handle $ref (should be preserved as-is, but OpenAPI uses #/components/schemas/...)
-  // Note: We'll handle $ref resolution separately in the schema collection phase
+  // Handle $ref (convert from #/definitions/... to #/components/schemas/...)
   if (jsonSchema.$ref !== undefined) {
-    // For now, we'll preserve it, but it will need to be resolved later
-    (openApiSchema as any).$ref = jsonSchema.$ref;
+    openApiSchema.$ref = convertRefPath(jsonSchema.$ref);
   }
 
-  return openApiSchema;
+  // Convert all nested $ref paths recursively
+  return convertRefsInSchema(openApiSchema);
 }
 
 // ============================================================================
@@ -471,4 +504,46 @@ export function extractSchema(schema: StandardSchemaV1): OpenAPIV3_1.SchemaObjec
 
   // Extract schema using vendor-specific function
   return extractor(schema);
+}
+
+/**
+ * Extract raw JSON Schema from a StandardSchemaV1 schema (before OpenAPI conversion)
+ * This is used to extract definitions that may be present in the JSON Schema
+ *
+ * @param schema StandardSchemaV1 compatible schema
+ * @returns Raw JSON Schema object (may include definitions property)
+ * @throws Error if schema is invalid or vendor is not supported
+ */
+export function extractRawJsonSchema(schema: StandardSchemaV1): any {
+  // Check if schema has ~standard property
+  if (!schema || typeof schema !== 'object' || !('~standard' in schema)) {
+    throw new Error(
+      'Schema does not have ~standard property. Ensure you are using a StandardSchemaV1 compatible schema.'
+    );
+  }
+
+  const standard = schema['~standard'];
+  if (!standard || typeof standard !== 'object') {
+    throw new Error('Schema ~standard property is invalid.');
+  }
+
+  // Get vendor name
+  const vendor = standard.vendor;
+  if (!vendor || typeof vendor !== 'string') {
+    throw new Error(
+      `Schema vendor is missing or invalid. Found: ${typeof vendor}. Ensure your schema library implements StandardSchemaV1.`
+    );
+  }
+
+  // Find vendor config
+  const config = vendorConfigs.find((c) => c.name === vendor);
+  if (!config) {
+    throw new Error(
+      `Unsupported schema vendor: "${vendor}". Supported vendors: ${vendorConfigs.map((c) => c.name).join(', ')}`
+    );
+  }
+
+  // Load vendor module and extract raw JSON Schema
+  const module = loadVendorModule(config);
+  return config.extract(module, schema);
 }
