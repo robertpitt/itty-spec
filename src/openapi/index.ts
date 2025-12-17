@@ -147,15 +147,139 @@ function createSchemaRef(schemaId: string): OpenAPIV3_1.ReferenceObject {
 }
 
 /**
- * Create a media type object with a schema reference
+ * Check if a schema is reference-only (only contains $ref and optional metadata)
+ * A schema is considered reference-only if it only has:
+ * - $ref property (required)
+ * - Optional metadata: description, summary, title
+ * - No other schema properties (no type, properties, items, etc.)
  */
-function createMediaTypeObject(schemaId: string | null): OpenAPIV3_1.MediaTypeObject | undefined {
-  if (!schemaId) {
+function isReferenceOnly(schema: OpenAPIV3_1.SchemaObject): boolean {
+  // Handle boolean schemas
+  if (typeof schema === 'boolean') {
+    return false;
+  }
+
+  // Must be an object
+  if (!schema || typeof schema !== 'object') {
+    return false;
+  }
+
+  // Must have $ref property
+  if (!('$ref' in schema) || typeof schema.$ref !== 'string') {
+    return false;
+  }
+
+  // Get all keys except metadata keys
+  const metadataKeys = new Set(['$ref', 'description', 'summary', 'title']);
+  const schemaKeys = Object.keys(schema).filter((key) => !metadataKeys.has(key));
+
+  // If there are any non-metadata keys, it's not reference-only
+  return schemaKeys.length === 0;
+}
+
+/**
+ * Extract schema name from a $ref path
+ * e.g., "#/components/schemas/SomeSchema" -> "SomeSchema"
+ */
+function extractSchemaNameFromRef(ref: string): string | null {
+  const match = ref.match(/^#\/components\/schemas\/(.+)$/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Check if a schema is empty (has no meaningful content)
+ * Empty schemas include:
+ * - Empty objects: { type: 'object' } with no properties
+ * - Void schemas: {} (no properties at all)
+ * - Schemas with only metadata (title, description) but no actual schema content
+ */
+function isEmptySchema(schema: OpenAPIV3_1.SchemaObject): boolean {
+  // Handle boolean schemas
+  if (typeof schema === 'boolean') {
+    return false; // true/false schemas have meaning
+  }
+
+  // Must be an object
+  if (!schema || typeof schema !== 'object') {
+    return true; // null/undefined are considered empty
+  }
+
+  // Metadata-only keys that don't constitute schema content
+  const metadataKeys = new Set([
+    'title',
+    'description',
+    'summary',
+    'example',
+    'examples',
+    'default',
+    'deprecated',
+    'externalDocs',
+    'xml',
+  ]);
+
+  // Get all keys that represent actual schema content
+  const contentKeys = Object.keys(schema).filter((key) => !metadataKeys.has(key));
+
+  // If there are no content keys, it's empty
+  if (contentKeys.length === 0) {
+    return true;
+  }
+
+  // If it only has $ref, it's reference-only (not empty, but handled separately)
+  if (contentKeys.length === 1 && contentKeys[0] === '$ref') {
+    return false; // Reference-only schemas are handled by isReferenceOnly
+  }
+
+  // Check for empty object schemas
+  if (schema.type === 'object') {
+    // Empty object: no properties, no additionalProperties, no patternProperties, etc.
+    const hasProperties =
+      (schema.properties && Object.keys(schema.properties).length > 0) ||
+      schema.patternProperties ||
+      schema.additionalProperties !== undefined ||
+      schema.minProperties !== undefined ||
+      schema.maxProperties !== undefined;
+
+    // If it's an object type with no properties and no other object-related constraints, it's empty
+    if (!hasProperties) {
+      // Check if there are any other meaningful constraints
+      const otherConstraints = contentKeys.filter(
+        (key) =>
+          !['type', 'required', 'nullable', 'readOnly', 'writeOnly', 'discriminator'].includes(key)
+      );
+      return otherConstraints.length === 0;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Create a media type object with a schema reference
+ * Accepts either a schema ID (string) or a direct ReferenceObject
+ */
+function createMediaTypeObject(
+  schemaRef: SchemaReferenceResult
+): OpenAPIV3_1.MediaTypeObject | undefined {
+  if (!schemaRef) {
     return undefined;
   }
-  return {
-    schema: createSchemaRef(schemaId),
-  };
+
+  // If it's already a ReferenceObject, use it directly
+  if (typeof schemaRef === 'object' && '$ref' in schemaRef) {
+    return {
+      schema: schemaRef,
+    };
+  }
+
+  // Otherwise, it's a schema ID string (TypeScript knows this after the check above)
+  if (typeof schemaRef === 'string') {
+    return {
+      schema: createSchemaRef(schemaRef),
+    };
+  }
+
+  return undefined;
 }
 
 /**
@@ -176,19 +300,18 @@ function createParameterFromProperty(
       schema: paramSchema,
     };
   }
-  
+
   // Extract description from schema (use title as fallback if description is missing)
   const description = paramSchema.description ?? paramSchema.title;
-  
+
   // Create a clean schema without title (title should be at parameter level, not schema level)
-  const cleanSchema: OpenAPIV3_1.SchemaObject = typeof paramSchema === 'object' && paramSchema !== null
-    ? { ...paramSchema }
-    : paramSchema;
-  
+  const cleanSchema: OpenAPIV3_1.SchemaObject =
+    typeof paramSchema === 'object' && paramSchema !== null ? { ...paramSchema } : paramSchema;
+
   if (typeof cleanSchema === 'object' && cleanSchema !== null && 'title' in cleanSchema) {
     delete cleanSchema.title;
   }
-  
+
   return {
     name,
     in: location,
@@ -283,14 +406,18 @@ function createRequestBodyContent(
 
   processContentTypeMap(requests, (contentType, schema) => {
     if (schema.body) {
-      const bodySchemaId = getOrCreateSchemaReference(
+      const bodySchemaRef = getOrCreateSchemaReference(
         schema.body,
         registry,
         `${operationId}Request${sanitizeContentType(contentType)}Body`
       );
-      const mediaTypeObj = createMediaTypeObject(bodySchemaId);
-      if (mediaTypeObj) {
-        content[contentType] = mediaTypeObj;
+      // If bodySchemaRef is null, it means the schema is empty (e.g., z.void())
+      // Skip adding empty request body schemas to content
+      if (bodySchemaRef !== null) {
+        const mediaTypeObj = createMediaTypeObject(bodySchemaRef);
+        if (mediaTypeObj) {
+          content[contentType] = mediaTypeObj;
+        }
       }
     }
   });
@@ -319,15 +446,21 @@ function createResponseContent(
 
     // Response body schema
     if (responseSchema.body) {
-      const bodySchemaId = getOrCreateSchemaReference(
+      const bodySchemaRef = getOrCreateSchemaReference(
         responseSchema.body,
         registry,
         `${operationId}Response${statusCode}${sanitizeContentType(contentType)}Body`
       );
-      const mediaTypeWithSchema = createMediaTypeObject(bodySchemaId);
-      if (mediaTypeWithSchema?.schema) {
-        mediaTypeObj.schema = mediaTypeWithSchema.schema;
+      // If bodySchemaRef is null, it means the schema is empty (e.g., z.void())
+      // We still create a media type object but without a schema property
+      // This is valid for responses like 204 No Content
+      if (bodySchemaRef !== null) {
+        const mediaTypeWithSchema = createMediaTypeObject(bodySchemaRef);
+        if (mediaTypeWithSchema?.schema) {
+          mediaTypeObj.schema = mediaTypeWithSchema.schema;
+        }
       }
+      // If bodySchemaRef is null, mediaTypeObj remains empty {}, which is correct
     }
 
     // Response headers schema (per content type) - inline directly
@@ -418,13 +551,20 @@ function generateSchemaId(registry: SchemaRegistry, prefix: string = 'Schema'): 
 }
 
 /**
+ * Result type for schema reference creation
+ * Can be a schema ID (string) or a direct reference object
+ */
+type SchemaReferenceResult = string | OpenAPIV3_1.ReferenceObject | null;
+
+/**
  * Get or create a schema reference in the registry
+ * Returns a schema ID if the schema has content, or a direct ReferenceObject if it's reference-only
  */
 function getOrCreateSchemaReference(
   schema: StandardSchemaV1 | undefined,
   registry: SchemaRegistry,
   nameHint?: string
-): string | null {
+): SchemaReferenceResult {
   if (!schema) {
     return null;
   }
@@ -432,7 +572,35 @@ function getOrCreateSchemaReference(
   // Check if we've already registered this schema
   const existingId = registry.schemaIds.get(schema);
   if (existingId) {
-    return existingId;
+    // Check if this was marked as empty
+    if (existingId === '__empty__') {
+      return null;
+    }
+
+    // Check if the existing ID points to a schema in the registry
+    const existingSchema = registry.schemas[existingId];
+    if (existingSchema) {
+      // If it's reference-only, return the reference directly
+      if (isReferenceOnly(existingSchema)) {
+        return existingSchema as OpenAPIV3_1.ReferenceObject;
+      }
+      // Check if this is a reference-only schema that we stored earlier
+      // by re-extracting and checking if it's reference-only
+      const reExtractedSchema = extractSchema(schema);
+      if (isReferenceOnly(reExtractedSchema)) {
+        // This was stored as a reference-only schema, return the reference directly
+        return reExtractedSchema as OpenAPIV3_1.ReferenceObject;
+      }
+      // Check if it's now empty (shouldn't happen, but handle it)
+      if (isEmptySchema(reExtractedSchema)) {
+        return null;
+      }
+      // Otherwise, return the schema ID
+      return existingId;
+    }
+    // If the ID doesn't exist in schemas, it means we stored a reference-only schema
+    // Reconstruct the ReferenceObject from the schema name
+    return createSchemaRef(existingId);
   }
 
   // Extract raw JSON Schema first to get definitions
@@ -456,10 +624,33 @@ function getOrCreateSchemaReference(
   // The main schema may contain $ref references to definitions, which will be converted
   const openApiSchema = extractSchema(schema);
 
-  // Generate a unique ID
-  const schemaId = nameHint || generateSchemaId(registry);
+  // Check if the extracted schema is empty (no meaningful content)
+  if (isEmptySchema(openApiSchema)) {
+    // Don't create a schema entry for empty schemas
+    // Store a marker in schemaIds to track that we've seen this schema (for deduplication)
+    // Use a special marker to indicate it's empty
+    registry.schemaIds.set(schema, '__empty__');
+    return null;
+  }
 
-  // Register the schema
+  // Check if the extracted schema is reference-only
+  if (isReferenceOnly(openApiSchema)) {
+    // Extract the referenced schema name
+    const ref = openApiSchema.$ref!;
+    const schemaName = extractSchemaNameFromRef(ref);
+
+    if (schemaName) {
+      // Store the mapping for deduplication (but don't create a wrapper schema)
+      // Use the referenced schema name as the ID for tracking
+      registry.schemaIds.set(schema, schemaName);
+
+      // Return the direct reference object
+      return openApiSchema as OpenAPIV3_1.ReferenceObject;
+    }
+  }
+
+  // Schema has actual content, register it
+  const schemaId = nameHint || generateSchemaId(registry);
   registry.schemas[schemaId] = openApiSchema;
   registry.schemaIds.set(schema, schemaId);
 
