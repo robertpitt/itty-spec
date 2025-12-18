@@ -34,9 +34,8 @@ import { ContractDefinition } from './types';
  *
  * @example
  * ```typescript
- * import { createContract } from './router';
+ * import { createContract, ContractDefinition } from 'itty-spec';
  * import { z } from 'zod';
- * import type { ContractDefinition } from './types';
  *
  * const contract = createContract({
  *   getUsers: {

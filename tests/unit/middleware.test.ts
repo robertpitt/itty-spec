@@ -158,8 +158,8 @@ describe('withSpecValidation - headers', () => {
 
     await withSpecValidation(request);
 
-    expect((request as any).validatedHeaders).toHaveProperty('authorization');
-    expect((request.validatedHeaders as Record<string, string>).authorization).toBe('Bearer token');
+    expect(request.validatedHeaders).toBeInstanceOf(Headers);
+    expect(request.validatedHeaders.get('authorization')).toBe('Bearer token');
   });
 
   test('should validate headers against schema when provided', async () => {
@@ -183,7 +183,8 @@ describe('withSpecValidation - headers', () => {
 
     await withSpecValidation(request);
 
-    expect((request as any).validatedHeaders).toHaveProperty('authorization');
+    expect(request.validatedHeaders).toBeInstanceOf(Headers);
+    expect(request.validatedHeaders.get('authorization')).toBe('Bearer token');
   });
 
   test('should handle plain object headers', async () => {
@@ -202,7 +203,8 @@ describe('withSpecValidation - headers', () => {
 
     await withSpecValidation(request);
 
-    expect(request.validatedHeaders).toHaveProperty('authorization');
+    expect(request.validatedHeaders).toBeInstanceOf(Headers);
+    expect(request.validatedHeaders.get('authorization')).toBe('Bearer token');
   });
 
   test('should handle comma-separated Accept header with matching first value', async () => {
@@ -227,8 +229,8 @@ describe('withSpecValidation - headers', () => {
 
     await withSpecValidation(request);
 
-    expect((request as any).validatedHeaders).toHaveProperty('accept');
-    expect((request.validatedHeaders as Record<string, string>).accept).toBe('application/json');
+    expect(request.validatedHeaders).toBeInstanceOf(Headers);
+    expect(request.validatedHeaders.get('accept')).toBe('application/json');
   });
 
   test('should handle comma-separated Accept header with matching later value', async () => {
@@ -253,8 +255,8 @@ describe('withSpecValidation - headers', () => {
 
     await withSpecValidation(request);
 
-    expect((request as any).validatedHeaders).toHaveProperty('accept');
-    expect((request.validatedHeaders as Record<string, string>).accept).toBe('application/xml');
+    expect(request.validatedHeaders).toBeInstanceOf(Headers);
+    expect(request.validatedHeaders.get('accept')).toBe('application/xml');
   });
 
   test('should fail validation when no comma-separated Accept values match', async () => {

@@ -239,7 +239,7 @@ test('ContractRequest should extend request with typed params, validatedQuery, v
   expectTypeOf<Request['query']>().toEqualTypeOf<{ page: number }>();
   expectTypeOf<Request['validatedQuery']>().toEqualTypeOf<{ page: number }>();
   expectTypeOf<Request['validatedBody']>().toEqualTypeOf<{ name: string }>();
-  expectTypeOf<Request['validatedHeaders']>().toEqualTypeOf<{ authorization: string }>();
+  expectTypeOf<Request['validatedHeaders']>().toEqualTypeOf<Headers>();
 });
 
 test('ContractRequest should include response helper methods', () => {
@@ -407,10 +407,10 @@ test('ContractRequest should expose predictable types when no schemas are provid
   > & { method: 'GET' };
   type Request = ContractRequest<Op>;
 
-  // Query falls back to itty's raw query shape, body is undefined, headers are normalized
+  // Query falls back to itty's raw query shape, body is undefined, headers are Headers object
   expectTypeOf<Request['query']>().toEqualTypeOf<Record<string, string | string[] | undefined>>();
   expectTypeOf<Request['validatedBody']>().toEqualTypeOf<undefined>();
-  expectTypeOf<Request['validatedHeaders']>().toEqualTypeOf<Record<string, string>>();
+  expectTypeOf<Request['validatedHeaders']>().toEqualTypeOf<Headers>();
 });
 
 test('ContractOperation should accept explicit method', () => {

@@ -326,7 +326,7 @@ test('Request with headers validation should handle request with validated heade
     contract,
     handlers: {
       getProtected: async (request) => {
-        const auth = request.validatedHeaders.authorization;
+        const auth = request.validatedHeaders.get('authorization');
         if (auth === 'Bearer token123') {
           return request.respond({
             status: 200,
@@ -2144,8 +2144,8 @@ test('Multiple headers validation should handle case-insensitive headers', async
     contract,
     handlers: {
       getProtected: async (request) => {
-        const auth = request.validatedHeaders.authorization;
-        const apiKey = request.validatedHeaders['x-api-key'];
+        const auth = request.validatedHeaders.get('authorization');
+        const apiKey = request.validatedHeaders.get('x-api-key');
         if (auth && apiKey) {
           return request.respond({
             status: 200,

@@ -1,6 +1,6 @@
 {
   "name": "itty-spec",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Type-safe contract first itty-router",
   "type": "module",
   "main": "./dist/index.cjs",

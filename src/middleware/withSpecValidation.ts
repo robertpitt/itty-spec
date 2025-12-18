@@ -50,9 +50,14 @@ export const withSpecValidation: RequestHandler<IRequest> = async (request: IReq
 
   // Validate headers
   const requestHeaders = normalizeHeaders(request.headers);
-  const headers = operation.headers
+  const validatedHeadersObject = operation.headers
     ? await validateHeadersWithFallback(operation.headers, requestHeaders)
     : requestHeaders;
+  // Convert to Headers object to align with Web API Request standard
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(validatedHeadersObject)) {
+    headers.set(key, String(value));
+  }
   defineProp(request, 'validatedHeaders', headers);
 
   // Validate body

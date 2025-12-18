@@ -9,8 +9,8 @@ import {
   formatCalculateErrorXML,
   formatCalculateResponseHTML,
   formatCalculateErrorHTML,
-  getPreferredContentType,
 } from './utils.ts';
+import { IRequest } from 'itty-router';
 
 /**
  * Convert the contract to an OpenAPI specification so we can serve it from the router
@@ -22,12 +22,17 @@ const openApiSpecification = createOpenApiSpecification(contract, {
   description: `# Simple API\nThis is a simple API that demonstrates the use of the contract-router library.\nIt is a basic API that allows you to calculate the sum of two numbers.\nIt also provides a documentation endpoint that allows you to view the API documentation.\n## Calculating the sum of two numbers\nTo calculate the sum of two numbers, you can use the following endpoint:`,
 });
 
-const router = createRouter({
+export type ExampleContext = {
+  version: 1;
+};
+
+const router = createRouter<typeof contract, IRequest, [ExampleContext]>({
   contract,
   handlers: {
-    getCalculate: async (request) => {
+    getCalculate: async (request, _context) => {
+      // Args are now properly propagated - context is available as the 2nd argument
       const result = request.validatedQuery.a + request.validatedQuery.b;
-      const contentType = getPreferredContentType(request.headers.get('Accept'));
+      const contentType = request.validatedHeaders.get('content-type');
 
       if (result > 100) {
         const errorMessage = 'Invalid request';
@@ -100,7 +105,7 @@ const router = createRouter({
   },
 });
 
-const adapter = createServerAdapter(router.fetch);
+const adapter = createServerAdapter((request) => router.fetch(request, { version: 1 }));
 const server = createServer(adapter);
 
 server.listen(3000, () => {

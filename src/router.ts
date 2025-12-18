@@ -67,7 +67,7 @@ export const createRouter = <
   Args extends any[] = any[],
 >(
   options: ContractRouterOptions<TContract, RequestType, Args>
-) => {
+): RouterType<RequestType, Args, Response> => {
   const missingHandler: ResponseHandler = (
     response: unknown,
     request: unknown,

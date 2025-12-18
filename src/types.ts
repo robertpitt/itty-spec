@@ -38,11 +38,6 @@ export type EmptyObject = Record<string, never>;
 type RawQuery = Record<string, string | string[] | undefined>;
 
 /**
- * Default headers object type when no schema is provided
- */
-type NormalizedHeaders = Record<string, string>;
-
-/**
  * Response schema structure with body and optional headers
  *
  * Note: `headers` being optional already expresses "no headers schema".
@@ -370,12 +365,10 @@ export type ContractOperationBody<O extends AnyContractOperation> = O['requests'
 
 /**
  * Extract headers type from a contract operation.
- * Falls back to NormalizedHeaders when no schema is provided.
+ * Always returns Headers to align with the Web API Request standard (https://developer.mozilla.org/en-US/docs/Web/API/Request).
+ * Note: Schema validation still occurs at runtime, but the type is always Headers.
  */
-export type ContractOperationHeaders<O extends AnyContractOperation> = InferOptionalSchema<
-  O['headers'],
-  NormalizedHeaders
->;
+export type ContractOperationHeaders<_O extends AnyContractOperation> = Headers;
 
 // ============================================================================
 // Router Types
