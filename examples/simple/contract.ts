@@ -117,11 +117,12 @@ export const contract = createContract({
     description: 'Calculate the sum of two numbers',
     query: CalculateRequest,
     headers: z.object({
-      'content-type': z.union([
+      'Content-Type': z.union([
         z.literal('application/json'),
         z.literal('text/html'),
         z.literal('application/xml'),
       ]),
+      Authorization: z.string(),
     }),
     responses: {
       200: {

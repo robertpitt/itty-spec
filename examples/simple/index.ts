@@ -32,6 +32,7 @@ const router = createRouter<typeof contract, IRequest, [ExampleContext]>({
     getCalculate: async (request, _context) => {
       // Args are now properly propagated - context is available as the 2nd argument
       const result = request.validatedQuery.a + request.validatedQuery.b;
+      // Headers are normalized to lowercase in types and runtime, regardless of how they're defined in the schema
       const contentType = request.validatedHeaders.get('content-type');
 
       if (result > 100) {

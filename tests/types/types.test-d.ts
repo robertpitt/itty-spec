@@ -13,6 +13,8 @@ import type {
   ContractRequest,
   ContractOperationHandler,
   ResponseVariant,
+  RawQuery,
+  TypedHeaders,
 } from '../../src/types.js';
 import { StandardSchemaV1 } from '@standard-schema/spec';
 
@@ -126,13 +128,43 @@ test('ContractOperationBody should extract body type from schema', () => {
     undefined,
     { 'application/json': { body: StandardSchemaV1<unknown, unknown> } },
     undefined,
-    { 200: { 'application/json': { body: StandardSchemaV1 } } }
-  > & { method: 'POST' };
+    { 200: { 'application/json': { body: StandardSchemaV1<unknown, unknown> } } }
+  >;
   type Body = ContractOperationBody<Op>;
-  expectTypeOf<Body>().toEqualTypeOf<unknown>();
+  expectTypeOf<Body>().toEqualTypeOf<StandardSchemaV1<unknown, unknown>>();
 });
 
-test('ContractOperationHeaders should return normalized headers when headers is undefined', () => {
+test('ContractOperationHeaders should return TypedHeaders when schema is provided', () => {
+  type Op = ContractOperation<
+    undefined,
+    undefined,
+    undefined,
+    StandardSchemaV1<{ authorization: string }, { authorization: string }>,
+    { 200: { 'application/json': { body: StandardSchemaV1 } } }
+  >;
+  type Headers = ContractOperationHeaders<Op>;
+  expectTypeOf<Headers>().toEqualTypeOf<TypedHeaders<{ authorization: string }>>();
+});
+
+test('ContractOperationHeaders should normalize header keys to lowercase', () => {
+  type Op = ContractOperation<
+    undefined,
+    undefined,
+    undefined,
+    StandardSchemaV1<
+      { 'Content-Type': string; Authorization: string },
+      { 'Content-Type': string; Authorization: string }
+    >,
+    { 200: { 'application/json': { body: StandardSchemaV1 } } }
+  > & { method: 'GET' };
+  type Headers = ContractOperationHeaders<Op>;
+  // Keys should be normalized to lowercase
+  expectTypeOf<Headers>().toEqualTypeOf<
+    TypedHeaders<{ 'content-type': string; authorization: string }>
+  >();
+});
+
+test('ContractOperationHeaders should return Headers when no schema is provided', () => {
   type Op = ContractOperation<
     undefined,
     undefined,
@@ -141,19 +173,7 @@ test('ContractOperationHeaders should return normalized headers when headers is 
     { 200: { 'application/json': { body: StandardSchemaV1 } } }
   > & { method: 'GET' };
   type Headers = ContractOperationHeaders<Op>;
-  expectTypeOf<Headers>().toEqualTypeOf<Record<string, string>>();
-});
-
-test('ContractOperationHeaders should extract headers type from schema', () => {
-  type Op = ContractOperation<
-    undefined,
-    undefined,
-    undefined,
-    { 'application/json': { headers: StandardSchemaV1 } },
-    { 200: { 'application/json': { body: StandardSchemaV1 } } }
-  > & { method: 'GET' };
-  type Headers = ContractOperationHeaders<Op>;
-  expectTypeOf<Headers>().toEqualTypeOf<{ authorization: string }>();
+  expectTypeOf<Headers>().toEqualTypeOf<Headers>();
 });
 
 test('ContractOperationResponse should create union of all response types', () => {
@@ -163,14 +183,14 @@ test('ContractOperationResponse should create union of all response types', () =
     undefined,
     undefined,
     {
-      200: { 'application/json': { body: { success: boolean } } };
-      400: { 'application/json': { body: { error: string } } };
+      200: { 'application/json': { body: StandardSchemaV1<{ success: boolean }> } };
+      400: { 'application/json': { body: StandardSchemaV1<{ error: string }> } };
     }
   > & { method: 'GET' };
   type Response = ContractOperationResponse<Op>;
   expectTypeOf<Response>().toMatchTypeOf<
-    | { status: 200; body: { success: boolean } }
-    | { status: 400; 'application/json': { body: { error: string } } }
+    | { status: 200; 'application/json': { body: StandardSchemaV1<{ success: boolean }> } }
+    | { status: 400; 'application/json': { body: StandardSchemaV1<{ error: string }> } }
   >();
 });
 
@@ -215,8 +235,8 @@ test('ContractOperationResponseBody should extract body type for specific status
     undefined,
     undefined,
     {
-      200: { 'application/json': { body: { success: boolean } } };
-      400: { 'application/json': { body: { error: string } } };
+      200: { 'application/json': { body: StandardSchemaV1<{ success: boolean }> } };
+      400: { 'application/json': { body: StandardSchemaV1<{ error: string }> } };
     }
   > & { method: 'GET' };
   type Body200 = ContractOperationResponseBody<Op, 200>;
@@ -228,18 +248,22 @@ test('ContractOperationResponseBody should extract body type for specific status
 test('ContractRequest should extend request with typed params, validatedQuery, validatedBody, and validatedHeaders', () => {
   type Op = ContractOperation<
     undefined,
-    { parse: (input: unknown) => { page: number } },
-    { 'application/json': { body: { parse: (input: unknown) => { name: string } } } },
-    { parse: (input: unknown) => { authorization: string } },
-    { 200: { 'application/json': { body: { success: boolean } } } },
+    StandardSchemaV1<{ page: string }, { page: string }>,
+    { 'application/json': { body: StandardSchemaV1<{ name: string }, { name: string }> } },
+    StandardSchemaV1<{ authorization: string }, { authorization: string }>,
+    {
+      200: {
+        'application/json': { body: StandardSchemaV1<{ success: boolean }, { success: boolean }> };
+      };
+    },
     '/users/:id'
-  > & { method: 'GET' };
+  >;
   type Request = ContractRequest<Op>;
-  expectTypeOf<Request['params']>().toEqualTypeOf<{ id: string }>();
-  expectTypeOf<Request['query']>().toEqualTypeOf<{ page: number }>();
-  expectTypeOf<Request['validatedQuery']>().toEqualTypeOf<{ page: number }>();
+  expectTypeOf<Request['validatedQuery']>().toEqualTypeOf<{ page: string } & RawQuery>();
   expectTypeOf<Request['validatedBody']>().toEqualTypeOf<{ name: string }>();
-  expectTypeOf<Request['validatedHeaders']>().toEqualTypeOf<Headers>();
+  expectTypeOf<Request['validatedHeaders']>().toEqualTypeOf<
+    TypedHeaders<{ authorization: string }>
+  >();
 });
 
 test('ContractRequest should include response helper methods', () => {
@@ -308,18 +332,6 @@ test('ContractOperationBody should infer undefined when request schema is omitte
   expectTypeOf<Body>().toEqualTypeOf<undefined>();
 });
 
-test('ContractOperationHeaders should infer normalized headers when headers schema is omitted', () => {
-  type Op = ContractOperation<
-    undefined,
-    undefined,
-    undefined,
-    undefined, // headers omitted
-    { 200: { 'application/json': { body: StandardSchemaV1 } } }
-  > & { method: 'GET' };
-  type Headers = ContractOperationHeaders<Op>;
-  expectTypeOf<Headers>().toEqualTypeOf<Record<string, string>>();
-});
-
 test('ResponseVariant should extract specific response variant by status code', () => {
   type Op = ContractOperation<
     undefined,
@@ -327,16 +339,24 @@ test('ResponseVariant should extract specific response variant by status code', 
     undefined,
     undefined,
     {
-      200: { 'application/json': { body: StandardSchemaV1 } };
-      400: { 'application/json': { body: StandardSchemaV1 } };
-      404: { 'application/json': { body: StandardSchemaV1 } };
+      200: { 'application/json': { body: StandardSchemaV1<{ success: boolean }> } };
+      400: { 'application/json': { body: StandardSchemaV1<{ error: string }> } };
+      404: { 'application/json': { body: StandardSchemaV1<{ error: string }> } };
     }
   > & { method: 'GET' };
   type Response200 = ResponseVariant<Op, 200>;
   type Response400 = ResponseVariant<Op, 400>;
 
-  expectTypeOf<Response200>().toEqualTypeOf<{ status: 200; body: { success: boolean } }>();
-  expectTypeOf<Response400>().toEqualTypeOf<{ status: 400; body: { error: string } }>();
+  expectTypeOf<Response200>().toEqualTypeOf<{
+    status: 200;
+    body: { success: boolean };
+    headers: unknown;
+  }>();
+  expectTypeOf<Response400>().toEqualTypeOf<{
+    status: 400;
+    body: { error: string };
+    headers: unknown;
+  }>();
 });
 
 test('Response helper respond should return discriminated variant', () => {

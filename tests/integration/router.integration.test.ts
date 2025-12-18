@@ -286,7 +286,7 @@ test('DELETE request with 204 No Content should handle DELETE request returning 
       deleteUser: async (request) => {
         const userId = request.params.id;
         if (userId === '123') {
-          return request.respond({ status: 204, contentType: 'application/json', body: undefined });
+          return request.respond({ status: 204, contentType: 'application/json' });
         }
         return request.respond({
           status: 404,

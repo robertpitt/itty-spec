@@ -35,7 +35,7 @@ export type EmptyObject = Record<string, never>;
 /**
  * Default query object type when no schema is provided
  */
-type RawQuery = Record<string, string | string[] | undefined>;
+export type RawQuery = Record<string, string | string[] | undefined>;
 
 /**
  * Response schema structure with body and optional headers
@@ -364,11 +364,80 @@ export type ContractOperationBody<O extends AnyContractOperation> = O['requests'
     : undefined;
 
 /**
- * Extract headers type from a contract operation.
- * Always returns Headers to align with the Web API Request standard (https://developer.mozilla.org/en-US/docs/Web/API/Request).
- * Note: Schema validation still occurs at runtime, but the type is always Headers.
+ * Header specification type - inferred output from headers schema
+ * Represents the shape of headers as defined by the schema (e.g., { authorization: string, 'x-api-key': string })
  */
-export type ContractOperationHeaders<_O extends AnyContractOperation> = Headers;
+export type HeaderSpec = Record<string, string>;
+
+/**
+ * Normalize all keys in a HeaderSpec to lowercase
+ * This ensures that regardless of how headers are defined in the schema,
+ * the type system and autocomplete will use lowercase keys (matching runtime behavior)
+ *
+ * Example: { 'Content-Type': string, 'Authorization': string } -> { 'content-type': string, 'authorization': string }
+ */
+type NormalizeHeaderKeys<T extends HeaderSpec> = {
+  [K in keyof T as K extends string ? Lowercase<K> : K]: T[K];
+};
+
+/**
+ * Typed header entry for iteration
+ */
+export type TypedHeaderEntry<S extends HeaderSpec> =
+  | [keyof S & string, S[keyof S & string]]
+  | [string, string];
+
+/**
+ * Typed Headers interface that extends the standard Headers API with type-safe get/set/append methods
+ * When a header name matches the HeaderSpec, methods return/accept the typed value.
+ * For unknown headers, methods fall back to string | null.
+ */
+export type TypedHeaders<S extends HeaderSpec> = Omit<
+  Headers,
+  'get' | 'set' | 'append' | 'has' | 'delete' | 'entries' | 'keys' | 'values' | 'forEach'
+> & {
+  // get
+  get<K extends keyof S & string>(name: K): S[K] | null;
+  get(name: string): string | null;
+
+  // set
+  set<K extends keyof S & string>(name: K, value: S[K]): void;
+  set(name: string, value: string): void;
+
+  // append
+  append<K extends keyof S & string>(name: K, value: S[K]): void;
+  append(name: string, value: string): void;
+
+  // has / delete (typed names + fallback)
+  has<K extends keyof S & string>(name: K): boolean;
+  has(name: string): boolean;
+
+  delete<K extends keyof S & string>(name: K): void;
+  delete(name: string): void;
+
+  // iteration
+  entries(): IterableIterator<TypedHeaderEntry<S>>;
+  keys(): IterableIterator<(keyof S & string) | string>;
+  values(): IterableIterator<S[keyof S & string] | string>;
+
+  forEach(
+    callbackfn: (value: string, key: (keyof S & string) | string, parent: Headers) => void,
+    thisArg?: any
+  ): void;
+};
+
+/**
+ * Extract headers type from a contract operation.
+ * Returns TypedHeaders when a headers schema is provided, otherwise falls back to Headers.
+ * This provides type safety for header access while maintaining compatibility with the Web API Request standard.
+ * Header keys are normalized to lowercase to match runtime behavior and provide consistent autocomplete.
+ */
+export type ContractOperationHeaders<O extends AnyContractOperation> =
+  O['headers'] extends StandardSchemaV1
+    ? TypedHeaders<NormalizeHeaderKeys<StandardSchemaV1.InferOutput<O['headers']>>>
+    : Headers;
+// ? StandardSchemaV1.InferOutput<O['headers']> extends HeaderSpec
+//   : Headers;
 
 // ============================================================================
 // Router Types
@@ -384,7 +453,7 @@ export type ContractOperationHeaders<_O extends AnyContractOperation> = Headers;
  */
 export type ContractOperationRequest<O extends AnyContractOperation> = IRequest & {
   params: ContractOperationParameters<O>;
-  query: ContractOperationQuery<O>;
+  query: RawQuery;
   validatedQuery: ContractOperationQuery<O>;
   validatedBody: ContractOperationBody<O>;
   validatedHeaders: ContractOperationHeaders<O>;
@@ -467,13 +536,14 @@ export type ResponseVariant<
 /**
  * Extract all valid content types for a given status code
  */
-type ExtractContentTypes<
+export type ExtractContentTypes<
   O extends ContractOperation,
   S extends ContractOperationStatusCodes<O>,
 > = O['responses'][S] extends ResponseByContentType ? keyof O['responses'][S] & string : never;
 
 /**
  * Response options for the respond() method
+ * When body type is `never` (e.g., from ZodNever), the body field is optional
  */
 export type RespondOptions<
   O extends ContractOperation,
@@ -482,9 +552,11 @@ export type RespondOptions<
 > = {
   status: S;
   contentType: C;
-  body: ContractOperationResponseBody<O, S, C>;
-  headers?: ContractOperationResponseHeaders<O, S, C>;
-};
+} & (ContractOperationResponseBody<O, S, C> extends never
+  ? { body?: never }
+  : { body: ContractOperationResponseBody<O, S, C> }) & {
+    headers?: ContractOperationResponseHeaders<O, S, C>;
+  };
 
 /**
  * Typed response helper method attached to the request object

@@ -4,6 +4,9 @@ import type {
   ResponseVariant,
   ResponseSchema,
   ResponseByContentType,
+  RespondOptions,
+  ContractOperationStatusCodes,
+  ExtractContentTypes,
 } from './types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 
@@ -69,12 +72,10 @@ export function createResponseHelpers<TOperation extends ContractOperation>(
   _operation: TOperation
 ): ContractOperationResponseHelpers<TOperation> {
   return {
-    respond(options: {
-      status: number;
-      contentType: string;
-      body: unknown;
-      headers?: unknown;
-    }): any {
+    respond<
+      S extends ContractOperationStatusCodes<TOperation>,
+      C extends ExtractContentTypes<TOperation, S> & string,
+    >(options: RespondOptions<TOperation, S, C>): ResponseVariant<TOperation, S> {
       const { status, contentType, body, headers } = options;
       const responseHeaders = headers ? new Headers(headers as HeadersInit) : new Headers();
 
@@ -92,10 +93,7 @@ export function createResponseHelpers<TOperation extends ContractOperation>(
       const finalHeaders =
         headers || responseHeaders.has('content-type') ? responseHeaders : undefined;
 
-      return createResponse(status, body, finalHeaders) as ResponseVariant<
-        TOperation,
-        typeof status
-      >;
+      return createResponse(status, body, finalHeaders) as ResponseVariant<TOperation, S>;
     },
   };
 }
