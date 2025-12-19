@@ -42,13 +42,13 @@ export type RawQuery = Record<string, string | string[] | undefined>;
  *
  * Note: `headers` being optional already expresses "no headers schema".
  */
-export type ResponseSchema<
+export interface ResponseSchema<
   TBody extends StandardSchemaV1 = StandardSchemaV1,
   THeaders extends StandardSchemaV1 = StandardSchemaV1,
-> = {
+> {
   body: TBody;
   headers?: THeaders;
-};
+}
 
 /**
  * Response schemas mapped by content type.
@@ -141,14 +141,14 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 
  * - `method` is optional - if omitted, defaults to 'GET'
  * - `requests` must be a RequestByContentType map (content-type keyed object)
  */
-export type ContractOperation<
+export interface ContractOperation<
   TPathParams extends StandardSchemaV1 | undefined = undefined,
   TQuery extends StandardSchemaV1 | undefined = undefined,
   TRequests extends RequestByContentType | undefined = undefined,
   THeaders extends StandardSchemaV1 | undefined = undefined,
   TResponses extends ResponseByStatusCode = ResponseByStatusCode,
   TPath extends string = string,
-> = {
+> {
   operationId?: string;
   description?: string;
   summary?: string;
@@ -161,7 +161,7 @@ export type ContractOperation<
   requests?: RequestSchemas<TRequests>;
   headers?: THeaders;
   responses: ResponseSchemas<TResponses>;
-};
+}
 
 /**
  * Type constraint for any contract operation.
@@ -191,13 +191,15 @@ type ContractOperationKeys =
  * If the operation has extra keys (like 'request' instead of 'requests'),
  * those keys are mapped to 'never', which will cause a type error.
  *
- * This works by intersecting the input type with a type that maps all
- * invalid keys to 'never'. TypeScript will error when trying to assign
- * an object with invalid keys because those keys would need to be 'never'.
+ * To reduce type pressure, we only apply the intersection if extra keys are detected.
+ * This prevents unnecessary type expansions for valid operations.
  */
-type ValidateOperation<T extends AnyContractOperation> = T & {
-  [K in Exclude<keyof T, ContractOperationKeys>]: never;
-};
+type ValidateOperation<T extends AnyContractOperation> =
+  Exclude<keyof T, ContractOperationKeys> extends never
+    ? T
+    : T & {
+        [K in Exclude<keyof T, ContractOperationKeys>]: never;
+      };
 
 /**
  * Contract definition - a record of operation IDs to operations
@@ -221,6 +223,13 @@ export type ContractDefinition<
  * But createContract now returns ContractWithSpec<T>
  */
 export type Contract<T extends ContractDefinition> = T;
+
+/**
+ * Helper type to merge intersection types into a single object type
+ */
+type Simplify<T> = {
+  [K in keyof T]: T[K];
+} & {};
 
 /**
  * Helper type to merge intersection types into a single object type
@@ -451,13 +460,13 @@ export type ContractOperationHeaders<O extends AnyContractOperation> =
  * IRequest's native `body` (ReadableStream) and `headers` (Headers object) properties.
  * The `params` property is kept as-is since it's standard in itty-router.
  */
-export type ContractOperationRequest<O extends AnyContractOperation> = IRequest & {
+export interface ContractOperationRequest<O extends AnyContractOperation> extends IRequest {
   params: ContractOperationParameters<O>;
   query: RawQuery;
   validatedQuery: ContractOperationQuery<O>;
   validatedBody: ContractOperationBody<O>;
   validatedHeaders: ContractOperationHeaders<O>;
-};
+}
 
 /**
  * Extract body type from a response (content-type map).
@@ -561,7 +570,7 @@ export type RespondOptions<
 /**
  * Typed response helper method attached to the request object
  */
-export type ContractOperationResponseHelpers<O extends ContractOperation> = {
+export interface ContractOperationResponseHelpers<O extends ContractOperation> {
   /**
    * Create a response with typed body, status code, and content type
    * Validates that the status code and content type exist in the contract
@@ -570,14 +579,14 @@ export type ContractOperationResponseHelpers<O extends ContractOperation> = {
   respond<S extends ContractOperationStatusCodes<O>, C extends ExtractContentTypes<O, S>>(
     options: RespondOptions<O, S, C>
   ): ResponseVariant<O, S>;
-};
+}
 
 /**
  * Contract request that extends ContractOperationRequest with typed response helpers
  * This is the primary request type that handlers receive
  */
-export type ContractRequest<O extends ContractOperation> = ContractOperationRequest<O> &
-  ContractOperationResponseHelpers<O>;
+export interface ContractRequest<O extends ContractOperation>
+  extends ContractOperationRequest<O>, ContractOperationResponseHelpers<O> {}
 
 /**
  * Handler function type for a contract operation
@@ -601,11 +610,11 @@ export type ContractRouterType<TContract extends ContractDefinition> = {
 /**
  * Options for ContractRouter
  */
-export type ContractRouterOptions<
+export interface ContractRouterOptions<
   TContract extends ContractDefinition,
   RequestType extends IRequest = IRequest,
   Args extends any[] = any[],
-> = {
+> {
   /** Contract definition */
   contract: TContract;
   /** Handlers mapped by operation ID */
@@ -632,7 +641,7 @@ export type ContractRouterOptions<
   finally?: ResponseHandler[];
   /** Base path for all routes */
   base?: string;
-};
+}
 
 /**
  * Internal type for request augmentation with contract operation metadata

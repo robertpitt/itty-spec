@@ -20,7 +20,7 @@ export const contract = createContract({
     responses: {
       200: {
         'application/json': {
-          body: z.object({ spec: z.any() }),
+          body: z.any(),
         },
       },
     },
