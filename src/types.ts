@@ -592,9 +592,9 @@ export interface ContractRequest<O extends ContractOperation>
  * Handler function type for a contract operation
  * Receives a typed request with response helpers
  */
-export type ContractOperationHandler<O extends ContractOperation> = (
+export type ContractOperationHandler<O extends ContractOperation, Args extends any[] = any[]> = (
   request: ContractRequest<O>,
-  ...args: any[]
+  ...args: Args
 ) => Promise<ContractOperationResponse<O>>;
 
 /**
@@ -619,7 +619,7 @@ export interface ContractRouterOptions<
   contract: TContract;
   /** Handlers mapped by operation ID */
   handlers: {
-    [K in keyof TContract]?: ContractOperationHandler<TContract[K]>;
+    [K in keyof TContract]?: ContractOperationHandler<TContract[K], Args>;
   };
   /** Response formatter (defaults to contract-aware JSON formatter) */
   format?: ResponseHandler;
