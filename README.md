@@ -12,6 +12,8 @@ Contract-first, type-safe API definitions for itty-router.
 
 If you like itty-router's "tiny router for Fetch" mental model, `itty-spec` keeps that model and adds a single source of truth: the contract. Perfect for Cloudflare Workers, AWS Lambda, Node.js servers, Bun, and Deno.
 
+[**Docs**](https://robertpitt.github.io/itty-spec)
+
 ---
 
 ## What this project provides
