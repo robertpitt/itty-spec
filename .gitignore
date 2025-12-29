@@ -3,6 +3,8 @@ node_modules/
 
 # Build output
 dist/
+docs-site/.vitepress/dist/
+docs-site/.vitepress/cache/
 
 # Test output
 coverage/
