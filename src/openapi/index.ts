@@ -72,11 +72,11 @@ class SchemaRegistry {
 
     // Handle reference-only schemas
     if (this.isReferenceOnly(open)) {
-      const ref = open.$ref!;
+      const ref = (open as OpenAPIV3_1.ReferenceObject).$ref!;
       const name = this.extractSchemaNameFromRef(ref);
       if (name) {
         this.ids.set(schema, name);
-        return open;
+        return open as OpenAPIV3_1.ReferenceObject;
       }
     }
 
@@ -141,7 +141,7 @@ class SchemaRegistry {
     if (schema.type === 'object') {
       const hasProperties =
         (schema.properties && Object.keys(schema.properties).length > 0) ||
-        schema.patternProperties ||
+        ('patternProperties' in schema && schema.patternProperties) ||
         schema.additionalProperties !== undefined ||
         schema.minProperties !== undefined ||
         schema.maxProperties !== undefined;
@@ -235,11 +235,12 @@ export const createOpenApiSpecification = async (
   for (const [opId, op] of Object.entries(contract)) {
     const p = convertPathToOpenAPIFormat(op.path);
     if (!paths[p]) {
-      paths[p] = {};
+      paths[p] = {} as OpenAPIV3_1.PathItemObject;
     }
-    const pathItem = paths[p]!;
-    const method = op.method.toLowerCase() as HttpMethod;
-    pathItem[method] = await createOpenApiOperation(op, reg, opId);
+    const pathItem = paths[p]! as OpenAPIV3_1.PathItemObject;
+    const method = op.method.toLowerCase() as Lowercase<HttpMethod>;
+    const operation = await createOpenApiOperation(op, reg, opId);
+    (pathItem as any)[method] = operation;
   }
 
   return {
@@ -389,7 +390,7 @@ async function makeParameters(
           name,
           in: 'path',
           required: isRequired,
-          schema: cleanSchema,
+          schema: cleanSchema as OpenAPIV3_1.ParameterObject['schema'],
           description,
         };
       } else {
@@ -425,7 +426,7 @@ async function makeParameters(
       name,
       in: location,
       required: isRequired,
-      schema: cleanSchema,
+      schema: cleanSchema as OpenAPIV3_1.ParameterObject['schema'],
       description,
     };
   });
@@ -538,11 +539,12 @@ export const createOpenApiPaths = async (
   for (const [operationId, operation] of Object.entries(contract)) {
     const openApiPath = convertPathToOpenAPIFormat(operation.path);
     if (!paths[openApiPath]) {
-      paths[openApiPath] = {};
+      paths[openApiPath] = {} as OpenAPIV3_1.PathItemObject;
     }
-    const pathItem = paths[openApiPath]!;
+    const pathItem = paths[openApiPath]! as OpenAPIV3_1.PathItemObject;
     const method = operation.method.toLowerCase() as Lowercase<HttpMethod>;
-    pathItem[method] = await createOpenApiOperation(operation, registry, operationId);
+    const op = await createOpenApiOperation(operation, registry, operationId);
+    (pathItem as any)[method] = op;
   }
   return paths;
 };
