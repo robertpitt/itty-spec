@@ -1,24 +1,17 @@
-import {
-  Router,
-  type RouterType,
-  type IRequest,
-  withParams,
-  error,
-  type ResponseHandler,
-} from 'itty-router';
+import { Router, type RouterType, type IRequest, withParams } from 'itty-router';
 import type {
   ContractDefinition,
   ContractRouterOptions,
   ContractRequest,
   HttpMethod,
 } from './types';
-import { createBasicResponseHelpers } from './utils';
 import {
   withMatchingContractOperation,
   withSpecValidation,
   withResponseHelpers,
   withContractFormat,
   withContractErrorHandler,
+  withMissingHandler,
 } from './middleware';
 
 /**
@@ -68,55 +61,35 @@ export const createRouter = <
 >(
   options: ContractRouterOptions<TContract, RequestType, Args>
 ): RouterType<RequestType, Args, Response> => {
-  const missingHandler: ResponseHandler = (
-    response: unknown,
-    request: unknown,
-    ...args: unknown[]
-  ) => {
-    if (response != null) return response as Response;
-    if (options.missing) {
-      return options.missing(
-        { ...(request as RequestType), ...createBasicResponseHelpers() } as RequestType &
-          ReturnType<typeof createBasicResponseHelpers>,
-        ...(args as Args)
-      );
-    }
-    return error(404);
-  };
-
-  const before = [
-    withParams as unknown as (request: RequestType, ...args: Args) => void,
-    withMatchingContractOperation(options.contract, options.base),
-    withSpecValidation,
-    withResponseHelpers,
-  ];
-  if (options.before) before.push(...options.before);
-
-  const finally_ = [missingHandler, withContractFormat(options.format)];
-  if (options.finally) finally_.push(...options.finally);
-
+  /**
+   * Define the router
+   */
   const router = Router<RequestType, Args, Response>({
     base: options.base,
-    before,
+    before: [
+      (request: RequestType, ..._other: Args) => withParams(request),
+      withMatchingContractOperation(options.contract, options.base),
+      withSpecValidation,
+      withResponseHelpers,
+      ...(options.before || []),
+    ],
     catch: withContractErrorHandler<RequestType, Args>(),
-    finally: finally_,
+    finally: [
+      withMissingHandler<RequestType, Args>(options.missing),
+      withContractFormat(options.format),
+      ...(options.finally || []),
+    ],
   });
 
   for (const [contractKey, operation] of Object.entries(options.contract)) {
     const handler = options.handlers[contractKey as keyof TContract];
+    const method = operation.method.toLowerCase() as Lowercase<HttpMethod>;
     if (!handler) continue;
-    if (!operation.method) {
-      throw new Error(
-        `Contract operation "${contractKey}" must explicitly specify a method. ` +
-          `Found: undefined. Please add method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS'`
-      );
-    }
-    router[operation.method.toLowerCase() as Lowercase<HttpMethod>]<IRequest, Args>(
-      operation.path,
-      async (request: IRequest, ...args: Args) =>
-        handler(request as ContractRequest<TContract[keyof TContract]>, ...args)
+
+    router[method]<IRequest, Args>(operation.path, async (request: IRequest, ...args: Args) =>
+      handler(request as ContractRequest<TContract[keyof TContract]>, ...args)
     );
   }
 
-  return router as RouterType<RequestType, Args, Response>;
+  return router;
 };

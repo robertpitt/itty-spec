@@ -1,7 +1,7 @@
 import { test, expect } from 'vitest';
 import { createRouter } from '../../src/router.js';
 import { createContract } from '../../src/contract.js';
-import { z } from 'zod/v4';
+import * as v from 'valibot';
 
 test('GET request with query parameters should handle validated query parameters', async () => {
   const contract = createContract({
@@ -9,13 +9,19 @@ test('GET request with query parameters should handle validated query parameters
       operationId: 'getCalculate',
       path: '/calculate',
       method: 'GET',
-      query: z.object({
-        a: z.string().transform((val) => parseInt(val, 10)),
-        b: z.string().transform((val) => parseInt(val, 10)),
+      query: v.object({
+        a: v.pipe(
+          v.string(),
+          v.transform((val) => parseInt(val, 10))
+        ),
+        b: v.pipe(
+          v.string(),
+          v.transform((val) => parseInt(val, 10))
+        ),
       }),
       responses: {
-        200: { 'application/json': { body: z.object({ result: z.number() }) } },
-        400: { 'application/json': { body: z.object({ error: z.string() }) } },
+        200: { 'application/json': { body: v.object({ result: v.number() }) } },
+        400: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -50,13 +56,19 @@ test('GET request with query parameters should return 400 for invalid query para
       operationId: 'getCalculate',
       path: '/calculate',
       method: 'GET',
-      query: z.object({
-        a: z.string().transform((val) => parseInt(val, 10)),
-        b: z.string().transform((val) => parseInt(val, 10)),
+      query: v.object({
+        a: v.pipe(
+          v.string(),
+          v.transform((val) => parseInt(val, 10))
+        ),
+        b: v.pipe(
+          v.string(),
+          v.transform((val) => parseInt(val, 10))
+        ),
       }),
       responses: {
-        200: { 'application/json': { body: z.object({ result: z.number() }) } },
-        400: { 'application/json': { body: z.object({ error: z.string() }) } },
+        200: { 'application/json': { body: v.object({ result: v.number() }) } },
+        400: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -93,15 +105,15 @@ test('POST request with body should handle validated body', async () => {
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            a: z.number().min(0).max(100),
-            b: z.number().min(0).max(100),
+          body: v.object({
+            a: v.pipe(v.number(), v.minValue(0), v.maxValue(100)),
+            b: v.pipe(v.number(), v.minValue(0), v.maxValue(100)),
           }),
         },
       },
       responses: {
-        200: { 'application/json': { body: z.object({ result: z.number() }) } },
-        400: { 'application/json': { body: z.object({ error: z.string() }) } },
+        200: { 'application/json': { body: v.object({ result: v.number() }) } },
+        400: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -142,15 +154,15 @@ test('POST request with body should return 400 for invalid body', async () => {
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            a: z.number().min(0).max(100),
-            b: z.number().min(0).max(100),
+          body: v.object({
+            a: v.pipe(v.number(), v.minValue(0), v.maxValue(100)),
+            b: v.pipe(v.number(), v.minValue(0), v.maxValue(100)),
           }),
         },
       },
       responses: {
-        200: { 'application/json': { body: z.object({ result: z.number() }) } },
-        400: { 'application/json': { body: z.object({ error: z.string() }) } },
+        200: { 'application/json': { body: v.object({ result: v.number() }) } },
+        400: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -190,8 +202,8 @@ test('GET request with path parameters should handle path parameters', async () 
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
-        404: { 'application/json': { body: z.object({ error: z.string() }) } },
+        200: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
+        404: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -232,8 +244,8 @@ test('GET request with path parameters should handle 404 for non-existent user',
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
-        404: { 'application/json': { body: z.object({ error: z.string() }) } },
+        200: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
+        404: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -274,8 +286,8 @@ test('DELETE request with 204 No Content should handle DELETE request returning 
       path: '/users/:id',
       method: 'DELETE',
       responses: {
-        204: { 'application/json': { body: z.never() } },
-        404: { 'application/json': { body: z.object({ error: z.string() }) } },
+        204: { 'application/json': { body: v.never() } },
+        404: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -312,12 +324,12 @@ test('Request with headers validation should handle request with validated heade
       operationId: 'getProtected',
       path: '/protected',
       method: 'GET',
-      headers: z.object({
-        authorization: z.string(),
+      headers: v.object({
+        authorization: v.string(),
       }),
       responses: {
-        200: { 'application/json': { body: z.object({ message: z.string() }) } },
-        401: { 'application/json': { body: z.object({ error: z.string() }) } },
+        200: { 'application/json': { body: v.object({ message: v.string() }) } },
+        401: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -361,15 +373,15 @@ test('Error handling should handle validation errors gracefully', async () => {
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().min(1),
-            email: z.email(),
+          body: v.object({
+            name: v.pipe(v.string(), v.minLength(1)),
+            email: v.pipe(v.string(), v.email()),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
-        400: { 'application/json': { body: z.object({ error: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
+        400: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -408,14 +420,17 @@ test('Query parameter validation should return 400 with error details for missin
     search: {
       path: '/search',
       method: 'GET',
-      query: z.object({
-        q: z.string().min(1),
-        page: z.string().transform((val) => parseInt(val, 10)),
+      query: v.object({
+        q: v.pipe(v.string(), v.minLength(1)),
+        page: v.pipe(
+          v.string(),
+          v.transform((val) => parseInt(val, 10))
+        ),
       }),
       responses: {
-        200: { 'application/json': { body: z.object({ results: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ results: v.array(v.string()) }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -450,20 +465,22 @@ test('Query parameter validation should return 400 for invalid type', async () =
     getItems: {
       path: '/items',
       method: 'GET',
-      query: z.object({
-        page: z
-          .string()
-          .regex(/^\d+$/)
-          .transform((val) => parseInt(val, 10)),
-        limit: z
-          .string()
-          .regex(/^\d+$/)
-          .transform((val) => parseInt(val, 10)),
+      query: v.object({
+        page: v.pipe(
+          v.string(),
+          v.regex(/^\d+$/),
+          v.transform((val) => parseInt(val, 10))
+        ),
+        limit: v.pipe(
+          v.string(),
+          v.regex(/^\d+$/),
+          v.transform((val) => parseInt(val, 10))
+        ),
       }),
       responses: {
-        200: { 'application/json': { body: z.object({ items: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ items: v.array(v.string()) }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -499,17 +516,17 @@ test('Body validation should return 400 with error details for missing required 
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().min(1),
-            email: z.string().email(),
-            age: z.number().min(18),
+          body: v.object({
+            name: v.pipe(v.string(), v.minLength(1)),
+            email: v.pipe(v.string(), v.email()),
+            age: v.pipe(v.number(), v.minValue(18)),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -550,16 +567,16 @@ test('Body validation should return 400 for invalid email format', async () => {
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().min(1),
-            email: z.string().email(),
+          body: v.object({
+            name: v.pipe(v.string(), v.minLength(1)),
+            email: v.pipe(v.string(), v.email()),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -599,16 +616,16 @@ test('Body validation should return 400 for value below minimum constraint', asy
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().min(1),
-            age: z.number().min(18).max(120),
+          body: v.object({
+            name: v.pipe(v.string(), v.minLength(1)),
+            age: v.pipe(v.number(), v.minValue(18), v.maxValue(120)),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -648,17 +665,17 @@ test('Body validation should return 400 for value above maximum constraint', asy
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().min(1),
-            price: z.number().min(0).max(10000),
-            quantity: z.number().int().min(0).max(1000),
+          body: v.object({
+            name: v.pipe(v.string(), v.minLength(1)),
+            price: v.pipe(v.number(), v.minValue(0), v.maxValue(10000)),
+            quantity: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1000)),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -698,24 +715,24 @@ test('Body validation should return 400 for invalid nested object structure', as
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            customer: z.object({
-              name: z.string().min(1),
-              email: z.string().email(),
+          body: v.object({
+            customer: v.object({
+              name: v.pipe(v.string(), v.minLength(1)),
+              email: v.pipe(v.string(), v.email()),
             }),
-            items: z.array(
-              z.object({
-                productId: z.string(),
-                quantity: z.number().min(1),
+            items: v.array(
+              v.object({
+                productId: v.string(),
+                quantity: v.pipe(v.number(), v.minValue(1)),
               })
             ),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ orderId: z.string() }) } },
+        201: { 'application/json': { body: v.object({ orderId: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -761,20 +778,20 @@ test('Body validation should return 400 for invalid array item', async () => {
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            items: z.array(
-              z.object({
-                productId: z.string().min(1),
-                quantity: z.number().min(1),
+          body: v.object({
+            items: v.array(
+              v.object({
+                productId: v.pipe(v.string(), v.minLength(1)),
+                quantity: v.pipe(v.number(), v.minValue(1)),
               })
             ),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ orderId: z.string() }) } },
+        201: { 'application/json': { body: v.object({ orderId: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -819,16 +836,16 @@ test('Body validation should return 400 for invalid JSON body', async () => {
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().min(1),
-            email: z.string().email(),
+          body: v.object({
+            name: v.pipe(v.string(), v.minLength(1)),
+            email: v.pipe(v.string(), v.email()),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -866,16 +883,16 @@ test('Body validation should return 400 for empty body when body is required', a
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().min(1),
-            email: z.string().email(),
+          body: v.object({
+            name: v.pipe(v.string(), v.minLength(1)),
+            email: v.pipe(v.string(), v.email()),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -913,14 +930,14 @@ test('Header validation should return 400 for missing required headers', async (
     getProtected: {
       path: '/protected',
       method: 'GET',
-      headers: z.object({
-        authorization: z.string().min(1),
-        'x-api-key': z.string().min(1),
+      headers: v.object({
+        authorization: v.pipe(v.string(), v.minLength(1)),
+        'x-api-key': v.pipe(v.string(), v.minLength(1)),
       }),
       responses: {
-        200: { 'application/json': { body: z.object({ message: z.string() }) } },
+        200: { 'application/json': { body: v.object({ message: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -954,13 +971,13 @@ test('Header validation should return 400 for invalid header format', async () =
     getProtected: {
       path: '/protected',
       method: 'GET',
-      headers: z.object({
-        authorization: z.string().regex(/^Bearer .+$/),
+      headers: v.object({
+        authorization: v.pipe(v.string(), v.regex(/^Bearer .+$/)),
       }),
       responses: {
-        200: { 'application/json': { body: z.object({ message: z.string() }) } },
+        200: { 'application/json': { body: v.object({ message: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -1000,18 +1017,18 @@ test('Multiple validation errors should return all error details', async () => {
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().min(3),
-            email: z.string().email(),
-            age: z.number().min(18).max(120),
-            password: z.string().min(8),
+          body: v.object({
+            name: v.pipe(v.string(), v.minLength(3)),
+            email: v.pipe(v.string(), v.email()),
+            age: v.pipe(v.number(), v.minValue(18), v.maxValue(120)),
+            password: v.pipe(v.string(), v.minLength(8)),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -1057,14 +1074,14 @@ test('Query parameter validation should return 400 for invalid enum value', asyn
     listItems: {
       path: '/items',
       method: 'GET',
-      query: z.object({
-        sort: z.enum(['asc', 'desc', 'name']),
-        filter: z.enum(['active', 'inactive', 'all']).optional(),
+      query: v.object({
+        sort: v.picklist(['asc', 'desc', 'name']),
+        filter: v.optional(v.picklist(['active', 'inactive', 'all'])),
       }),
       responses: {
-        200: { 'application/json': { body: z.object({ items: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ items: v.array(v.string()) }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -1100,16 +1117,16 @@ test('Body validation should return 400 for invalid URL format', async () => {
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            title: z.string().min(1),
-            url: z.string().url(),
+          body: v.object({
+            title: v.pipe(v.string(), v.minLength(1)),
+            url: v.pipe(v.string(), v.url()),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), title: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), title: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -1152,16 +1169,16 @@ test('Body validation should return 400 for invalid UUID format', async () => {
       method: 'PUT',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().min(1),
-            referenceId: z.string().uuid(),
+          body: v.object({
+            name: v.pipe(v.string(), v.minLength(1)),
+            referenceId: v.pipe(v.string(), v.uuid()),
           }),
         },
       },
       responses: {
-        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        200: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -1204,16 +1221,16 @@ test('Validation error response should have correct content-type header', async 
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().min(1),
-            email: z.string().email(),
+          body: v.object({
+            name: v.pipe(v.string(), v.minLength(1)),
+            email: v.pipe(v.string(), v.email()),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
         400: {
-          'application/json': { body: z.object({ error: z.string(), details: z.unknown() }) },
+          'application/json': { body: v.object({ error: v.string(), details: v.unknown() }) },
         },
       },
     },
@@ -1254,7 +1271,7 @@ test('Multiple operations should handle multiple operations in same router', asy
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
     getUser: {
@@ -1262,7 +1279,7 @@ test('Multiple operations should handle multiple operations in same router', asy
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        200: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
       },
     },
     createUser: {
@@ -1271,11 +1288,11 @@ test('Multiple operations should handle multiple operations in same router', asy
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({ name: z.string() }),
+          body: v.object({ name: v.string() }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
       },
     },
   });
@@ -1339,7 +1356,7 @@ test('Optional operationId should default to contract key', async () => {
       path: '/users/:id/profile',
       method: 'GET', // method is now required
       responses: {
-        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        200: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
       },
     },
   });
@@ -1372,7 +1389,7 @@ test('Method is required and must be explicitly specified', async () => {
       path: '/items',
       method: 'GET', // method is now required
       responses: {
-        200: { 'application/json': { body: z.object({ items: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ items: v.array(v.string()) }) } },
       },
     },
   });
@@ -1405,7 +1422,7 @@ test('Explicit operationId should override contract key', async () => {
       method: 'GET', // method is now required
       path: '/users/:id/profile',
       responses: {
-        200: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        200: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
       },
     },
   });
@@ -1439,11 +1456,11 @@ test('Explicit method should override default GET', async () => {
       method: 'POST', // Explicit method
       requests: {
         'application/json': {
-          body: z.object({ name: z.string() }),
+          body: v.object({ name: v.string() }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
       },
     },
   });
@@ -1485,10 +1502,10 @@ test('Nested routes with multiple path parameters should handle complex paths', 
       responses: {
         200: {
           'application/json': {
-            body: z.object({ userId: z.string(), postId: z.string(), title: z.string() }),
+            body: v.object({ userId: v.string(), postId: v.string(), title: v.string() }),
           },
         },
-        404: { 'application/json': { body: z.object({ error: z.string() }) } },
+        404: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -1523,17 +1540,20 @@ test('Complex query parameters with arrays should handle array query params', as
     searchItems: {
       path: '/items/search',
       method: 'GET',
-      query: z.object({
-        tags: z.array(z.string()).optional(),
-        categories: z.array(z.string()).default([]),
-        page: z
-          .string()
-          .transform((val) => parseInt(val, 10))
-          .default(1),
+      query: v.object({
+        tags: v.optional(v.array(v.string())),
+        categories: v.fallback(v.array(v.string()), []),
+        page: v.fallback(
+          v.pipe(
+            v.string(),
+            v.transform((val) => parseInt(val, 10))
+          ),
+          1
+        ),
       }),
       responses: {
         200: {
-          'application/json': { body: z.object({ items: z.array(z.string()), total: z.number() }) },
+          'application/json': { body: v.object({ items: v.array(v.string()), total: v.number() }) },
         },
       },
     },
@@ -1556,7 +1576,6 @@ test('Complex query parameters with arrays should handle array query params', as
 
   const request = new Request('http://localhost:3000/items/search?tags=tag1&tags=tag2&page=2');
   const response = await router.fetch(request);
-
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(body.items).toContain('tag1');
@@ -1571,19 +1590,19 @@ test('PUT request should handle update operations', async () => {
       method: 'PUT',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().min(1),
-            email: z.email(),
+          body: v.object({
+            name: v.pipe(v.string(), v.minLength(1)),
+            email: v.pipe(v.string(), v.email()),
           }),
         },
       },
       responses: {
         200: {
           'application/json': {
-            body: z.object({ id: z.string(), name: z.string(), email: z.string() }),
+            body: v.object({ id: v.string(), name: v.string(), email: v.string() }),
           },
         },
-        404: { 'application/json': { body: z.object({ error: z.string() }) } },
+        404: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -1628,19 +1647,19 @@ test('PATCH request should handle partial updates', async () => {
       method: 'PATCH',
       requests: {
         'application/json': {
-          body: z.object({
-            name: z.string().optional(),
-            email: z.email().optional(),
+          body: v.object({
+            name: v.optional(v.string()),
+            email: v.optional(v.pipe(v.string(), v.email())),
           }),
         },
       },
       responses: {
         200: {
           'application/json': {
-            body: z.object({
-              id: z.string(),
-              name: z.string().optional(),
-              email: z.string().optional(),
+            body: v.object({
+              id: v.string(),
+              name: v.optional(v.string()),
+              email: v.optional(v.string()),
             }),
           },
         },
@@ -1684,7 +1703,7 @@ test('Base path should prefix all routes', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
   });
@@ -1723,7 +1742,7 @@ test('Custom missing handler should handle 404 routes', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
   });
@@ -1773,7 +1792,7 @@ test('Before middleware should run before handlers', async () => {
       responses: {
         200: {
           'application/json': {
-            body: z.object({ users: z.array(z.string()), requestId: z.string() }),
+            body: v.object({ users: v.array(v.string()), requestId: v.string() }),
           },
         },
       },
@@ -1818,7 +1837,7 @@ test('Finally middleware should run after handlers', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
   });
@@ -1858,21 +1877,21 @@ test('Route precedence should match specific routes before general ones', async 
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ type: z.literal('list') }) } },
+        200: { 'application/json': { body: v.object({ type: v.literal('list') }) } },
       },
     },
     getUser: {
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ type: z.literal('single') }) } },
+        200: { 'application/json': { body: v.object({ type: v.literal('single') }) } },
       },
     },
     getUserPosts: {
       path: '/users/:id/posts',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ type: z.literal('posts') }) } },
+        200: { 'application/json': { body: v.object({ type: v.literal('posts') }) } },
       },
     },
   });
@@ -1928,7 +1947,7 @@ test('URL encoding should handle special characters in paths', async () => {
     getUser: {
       path: '/users/:id',
       method: 'GET',
-      responses: { 200: { 'application/json': { body: z.object({ id: z.string() }) } } },
+      responses: { 200: { 'application/json': { body: v.object({ id: v.string() }) } } },
     },
   });
 
@@ -1969,14 +1988,14 @@ test('Query parameters with special characters should be handled correctly', asy
     search: {
       path: '/search',
       method: 'GET',
-      query: z.object({
-        q: z.string(),
-        filter: z.string().optional(),
+      query: v.object({
+        q: v.string(),
+        filter: v.optional(v.string()),
       }),
       responses: {
         200: {
           'application/json': {
-            body: z.object({ query: z.string(), filter: z.string().optional() }),
+            body: v.object({ query: v.string(), filter: v.optional(v.string()) }),
           },
         },
       },
@@ -2016,24 +2035,24 @@ test('Complex nested body should handle nested objects and arrays', async () => 
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            customer: z.object({
-              name: z.string(),
-              email: z.email(),
+          body: v.object({
+            customer: v.object({
+              name: v.string(),
+              email: v.pipe(v.string(), v.email()),
             }),
-            items: z.array(
-              z.object({
-                productId: z.string(),
-                quantity: z.number().min(1),
-                price: z.number(),
+            items: v.array(
+              v.object({
+                productId: v.string(),
+                quantity: v.pipe(v.number(), v.minValue(1)),
+                price: v.number(),
               })
             ),
-            metadata: z.record(z.string(), z.unknown()).optional(),
+            metadata: v.optional(v.record(v.string(), v.unknown())),
           }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ orderId: z.string(), total: z.number() }) } },
+        201: { 'application/json': { body: v.object({ orderId: v.string(), total: v.number() }) } },
       },
     },
   });
@@ -2088,8 +2107,8 @@ test('Handler throwing errors should be handled gracefully', async () => {
       method: 'GET',
       responses: {
         200: {
-          'application/json': { body: z.object({ users: z.array(z.string()) }) },
-          500: { 'application/json': { body: z.object({ error: z.string() }) } },
+          'application/json': { body: v.object({ users: v.array(v.string()) }) },
+          500: { 'application/json': { body: v.object({ error: v.string() }) } },
         },
       },
     },
@@ -2126,16 +2145,16 @@ test('Multiple headers validation should handle case-insensitive headers', async
     getProtected: {
       path: '/protected',
       method: 'GET',
-      headers: z.object({
-        authorization: z.string(),
-        'x-api-key': z.string(),
-        'x-request-id': z.string().optional(),
+      headers: v.object({
+        authorization: v.string(),
+        'x-api-key': v.string(),
+        'x-request-id': v.optional(v.string()),
       }),
       responses: {
         200: {
-          'application/json': { body: z.object({ message: z.string() }) },
+          'application/json': { body: v.object({ message: v.string() }) },
         },
-        401: { 'application/json': { body: z.object({ error: z.string() }) } },
+        401: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -2171,7 +2190,6 @@ test('Multiple headers validation should handle case-insensitive headers', async
     },
   });
   const response = await router.fetch(request);
-
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(body.message).toBe('Access granted');
@@ -2185,10 +2203,10 @@ test('Response headers should be set correctly', async () => {
       responses: {
         200: {
           'application/json': {
-            body: z.object({ users: z.array(z.string()) }),
-            headers: z.object({
-              'x-total-count': z.string().optional(),
-              'cache-control': z.string().optional(),
+            body: v.object({ users: v.array(v.string()) }),
+            headers: v.object({
+              'x-total-count': v.optional(v.string()),
+              'cache-control': v.optional(v.string()),
             }),
           },
         },
@@ -2228,15 +2246,15 @@ test('Empty query parameters should handle optional params', async () => {
     listItems: {
       path: '/items',
       method: 'GET',
-      query: z.object({
-        page: z.string().optional(),
-        limit: z.string().optional(),
-        sort: z.enum(['asc', 'desc']).optional(),
+      query: v.object({
+        page: v.optional(v.string()),
+        limit: v.optional(v.string()),
+        sort: v.optional(v.picklist(['asc', 'desc'])),
       }),
       responses: {
         200: {
           'application/json': {
-            body: z.object({ items: z.array(z.string()), page: z.number().optional() }),
+            body: v.object({ items: v.array(v.string()), page: v.optional(v.number()) }),
           },
         },
       },
@@ -2281,14 +2299,14 @@ test('Empty body should handle optional body validation', async () => {
       method: 'PATCH',
       requests: {
         'application/json': {
-          body: z.object({
-            theme: z.string().optional(),
-            notifications: z.boolean().optional(),
+          body: v.object({
+            theme: v.optional(v.string()),
+            notifications: v.optional(v.boolean()),
           }),
         },
       },
       responses: {
-        200: { 'application/json': { body: z.object({ updated: z.boolean() }) } },
+        200: { 'application/json': { body: v.object({ updated: v.boolean() }) } },
       },
     },
   });
@@ -2325,7 +2343,7 @@ test('Same path different methods should handle route conflicts correctly', asyn
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
     createUser: {
@@ -2333,11 +2351,11 @@ test('Same path different methods should handle route conflicts correctly', asyn
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({ name: z.string() }),
+          body: v.object({ name: v.string() }),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ id: z.string(), name: z.string() }) } },
+        201: { 'application/json': { body: v.object({ id: v.string(), name: v.string() }) } },
       },
     },
     updateUsers: {
@@ -2345,18 +2363,18 @@ test('Same path different methods should handle route conflicts correctly', asyn
       method: 'PUT',
       requests: {
         'application/json': {
-          body: z.object({ users: z.array(z.string()) }),
+          body: v.object({ users: v.array(v.string()) }),
         },
       },
       responses: {
-        200: { 'application/json': { body: z.object({ updated: z.number() }) } },
+        200: { 'application/json': { body: v.object({ updated: v.number() }) } },
       },
     },
     deleteUsers: {
       path: '/users',
       method: 'DELETE',
       responses: {
-        204: { 'application/json': { body: z.undefined() } },
+        204: { 'application/json': { body: v.undefined() } },
       },
     },
   });
@@ -2426,7 +2444,7 @@ test('Path parameters with special characters should be preserved', async () => 
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ id: z.string() }) } },
+        200: { 'application/json': { body: v.object({ id: v.string() }) } },
       },
     },
   });
@@ -2466,18 +2484,18 @@ test('Large payload should handle big request bodies', async () => {
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.object({
-            items: z.array(
-              z.object({
-                name: z.string(),
-                description: z.string(),
-                tags: z.array(z.string()),
+          body: v.object({
+            items: v.array(
+              v.object({
+                name: v.string(),
+                description: v.string(),
+                tags: v.array(v.string()),
               })
             ),
           }),
         },
       },
-      responses: { 201: { 'application/json': { body: z.object({ created: z.number() }) } } },
+      responses: { 201: { 'application/json': { body: v.object({ created: v.number() }) } } },
     },
   });
 
@@ -2518,27 +2536,35 @@ test('Query parameter transformations should handle complex transforms', async (
     search: {
       path: '/search',
       method: 'GET',
-      query: z.object({
-        page: z
-          .string()
-          .transform((val) => parseInt(val, 10))
-          .default(1),
-        limit: z
-          .string()
-          .transform((val) => Math.min(parseInt(val, 10), 100))
-          .default(10),
-        includeDeleted: z
-          .string()
-          .transform((val) => val === 'true')
-          .optional(),
+      query: v.object({
+        page: v.fallback(
+          v.pipe(
+            v.string(),
+            v.transform((val) => parseInt(val, 10))
+          ),
+          1
+        ),
+        limit: v.fallback(
+          v.pipe(
+            v.string(),
+            v.transform((val) => Math.min(parseInt(val, 10), 100))
+          ),
+          10
+        ),
+        includeDeleted: v.optional(
+          v.pipe(
+            v.string(),
+            v.transform((val) => val === 'true')
+          )
+        ),
       }),
       responses: {
         200: {
           'application/json': {
-            body: z.object({
-              page: z.number(),
-              limit: z.number(),
-              includeDeleted: z.boolean().optional(),
+            body: v.object({
+              page: v.number(),
+              limit: v.number(),
+              includeDeleted: v.optional(v.boolean()),
             }),
           },
         },
@@ -2580,22 +2606,22 @@ test('Union types in body should handle discriminated unions', async () => {
       method: 'POST',
       requests: {
         'application/json': {
-          body: z.discriminatedUnion('type', [
-            z.object({
-              type: z.literal('user'),
-              userId: z.string(),
-              action: z.string(),
+          body: v.union([
+            v.object({
+              type: v.literal('user'),
+              userId: v.string(),
+              action: v.string(),
             }),
-            z.object({
-              type: z.literal('system'),
-              systemId: z.string(),
-              event: z.string(),
+            v.object({
+              type: v.literal('system'),
+              systemId: v.string(),
+              event: v.string(),
             }),
           ]),
         },
       },
       responses: {
-        201: { 'application/json': { body: z.object({ eventId: z.string(), type: z.string() }) } },
+        201: { 'application/json': { body: v.object({ eventId: v.string(), type: v.string() }) } },
       },
     },
   });

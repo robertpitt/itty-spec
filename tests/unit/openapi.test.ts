@@ -2,7 +2,7 @@ import { test, expect, describe } from 'vitest';
 import { createContract } from '../../src/index.js';
 import { createOpenApiSpecification } from '../../src/openapi/index.js';
 import type { OpenAPIV3_1 } from '../../src/openapi/types.js';
-import { z } from 'zod/v4';
+import * as v from 'valibot';
 
 describe('OpenAPI Specification Generation', () => {
   test('should generate basic OpenAPI spec with minimal contract', () => {
@@ -11,7 +11,7 @@ describe('OpenAPI Specification Generation', () => {
         path: '/users',
         method: 'GET',
         responses: {
-          200: { body: z.object({ users: z.array(z.string()) }) },
+          200: { body: v.object({ users: v.array(v.string()) }) },
         },
       },
     });
@@ -34,7 +34,7 @@ describe('OpenAPI Specification Generation', () => {
         path: '/users/:id',
         method: 'GET',
         responses: {
-          200: { body: z.object({ id: z.string() }) },
+          200: { body: v.object({ id: v.string() }) },
         },
       },
     });
@@ -54,7 +54,7 @@ describe('OpenAPI Specification Generation', () => {
         path: '/users/:id',
         method: 'GET',
         responses: {
-          200: { body: z.object({ id: z.string() }) },
+          200: { body: v.object({ id: v.string() }) },
         },
       },
     });
@@ -81,11 +81,11 @@ describe('OpenAPI Specification Generation', () => {
       getUser: {
         path: '/users/:id',
         method: 'GET',
-        pathParams: z.object({
-          id: z.string().uuid().describe('User UUID'),
+        pathParams: v.object({
+          id: v.pipe(v.string(), v.uuid(), v.description('User UUID')),
         }),
         responses: {
-          200: { body: z.object({ id: z.string() }) },
+          200: { body: v.object({ id: v.string() }) },
         },
       },
     });
@@ -109,12 +109,12 @@ describe('OpenAPI Specification Generation', () => {
       getUserPost: {
         path: '/users/:userId/posts/:postId',
         method: 'GET',
-        pathParams: z.object({
-          userId: z.string().uuid(),
+        pathParams: v.object({
+          userId: v.pipe(v.string(), v.uuid()),
           // postId not in schema, should fallback to string
         }),
         responses: {
-          200: { body: z.object({ userId: z.string(), postId: z.string() }) },
+          200: { body: v.object({ userId: v.string(), postId: v.string() }) },
         },
       },
     });
@@ -139,13 +139,13 @@ describe('OpenAPI Specification Generation', () => {
       getUsers: {
         path: '/users',
         method: 'GET',
-        query: z.object({
-          page: z.number().int().min(1).describe('Page number'),
-          limit: z.number().int().min(1).max(100).optional(),
-          search: z.string().optional(),
+        query: v.object({
+          page: v.pipe(v.number(), v.integer(), v.minValue(1), v.description('Page number')),
+          limit: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100))),
+          search: v.optional(v.string()),
         }),
         responses: {
-          200: { body: z.object({ users: z.array(z.string()) }) },
+          200: { body: v.object({ users: v.array(v.string()) }) },
         },
       },
     });
@@ -190,15 +190,15 @@ describe('OpenAPI Specification Generation', () => {
         method: 'POST',
         requests: {
           'application/json': {
-            body: z.object({
-              name: z.string().min(1),
-              email: z.string().email(),
-              age: z.number().int().min(0).optional(),
+            body: v.object({
+              name: v.pipe(v.string(), v.minLength(1)),
+              email: v.pipe(v.string(), v.email()),
+              age: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
             }),
           },
         },
         responses: {
-          201: { body: z.object({ id: z.string(), name: z.string() }) },
+          201: { body: v.object({ id: v.string(), name: v.string() }) },
         },
       },
     });
@@ -223,12 +223,12 @@ describe('OpenAPI Specification Generation', () => {
       getUsers: {
         path: '/users',
         method: 'GET',
-        headers: z.object({
-          'X-API-Key': z.string().describe('API key for authentication'),
-          'X-Request-ID': z.string().uuid().optional(),
+        headers: v.object({
+          'X-API-Key': v.pipe(v.string(), v.description('API key for authentication')),
+          'X-Request-ID': v.optional(v.pipe(v.string(), v.uuid())),
         }),
         responses: {
-          200: { body: z.object({ users: z.array(z.string()) }) },
+          200: { body: v.object({ users: v.array(v.string()) }) },
         },
       },
     });
@@ -266,20 +266,20 @@ describe('OpenAPI Specification Generation', () => {
         responses: {
           200: {
             'application/json': {
-              body: z.object({
-                id: z.string(),
-                name: z.string(),
-                email: z.string().email(),
+              body: v.object({
+                id: v.string(),
+                name: v.string(),
+                email: v.pipe(v.string(), v.email()),
               }),
-              headers: z.object({
-                'X-Request-ID': z.string().uuid(),
-                'X-RateLimit-Remaining': z.number().int(),
+              headers: v.object({
+                'X-Request-ID': v.pipe(v.string(), v.uuid()),
+                'X-RateLimit-Remaining': v.pipe(v.number(), v.integer()),
               }),
             },
           },
           404: {
             'application/json': {
-              body: z.object({ error: z.string() }),
+              body: v.object({ error: v.string() }),
             },
           },
         },
@@ -316,14 +316,14 @@ describe('OpenAPI Specification Generation', () => {
         method: 'POST',
         requests: {
           'application/json': {
-            body: z.object({
-              name: z.string(),
-              email: z.string().email(),
+            body: v.object({
+              name: v.string(),
+              email: v.pipe(v.string(), v.email()),
             }),
           },
         },
         responses: {
-          201: { body: z.object({ id: z.string(), name: z.string() }) },
+          201: { body: v.object({ id: v.string(), name: v.string() }) },
         },
       },
     });
@@ -338,10 +338,10 @@ describe('OpenAPI Specification Generation', () => {
   });
 
   test('should deduplicate schemas when reused', () => {
-    const userSchema = z.object({
-      id: z.string(),
-      name: z.string(),
-      email: z.string().email(),
+    const userSchema = v.object({
+      id: v.string(),
+      name: v.string(),
+      email: v.pipe(v.string(), v.email()),
     });
 
     const contract = createContract({
@@ -384,7 +384,7 @@ describe('OpenAPI Specification Generation', () => {
         path: '/users',
         method: 'GET',
         responses: {
-          200: { body: z.object({ users: z.array(z.string()) }) },
+          200: { body: v.object({ users: v.array(v.string()) }) },
         },
       },
       createUser: {
@@ -392,11 +392,11 @@ describe('OpenAPI Specification Generation', () => {
         method: 'POST',
         requests: {
           'application/json': {
-            body: z.object({ name: z.string() }),
+            body: v.object({ name: v.string() }),
           },
         },
         responses: {
-          201: { body: z.object({ id: z.string() }) },
+          201: { body: v.object({ id: v.string() }) },
         },
       },
     });
@@ -421,7 +421,7 @@ describe('OpenAPI Specification Generation', () => {
         description: 'Retrieves a single user by their unique identifier',
         tags: ['users'],
         responses: {
-          200: { body: z.object({ id: z.string() }) },
+          200: { body: v.object({ id: v.string() }) },
         },
       },
     });
@@ -445,31 +445,31 @@ describe('OpenAPI Specification Generation', () => {
         method: 'POST',
         requests: {
           'application/json': {
-            body: z.object({
-              items: z.array(
-                z.object({
-                  productId: z.string(),
-                  quantity: z.number().int().min(1),
-                  price: z.number().positive(),
+            body: v.object({
+              items: v.array(
+                v.object({
+                  productId: v.string(),
+                  quantity: v.pipe(v.number(), v.integer(), v.minValue(1)),
+                  price: v.pipe(v.number(), v.minValue(1)),
                 })
               ),
-              shippingAddress: z.object({
-                street: z.string(),
-                city: z.string(),
-                zipCode: z.string(),
+              shippingAddress: v.object({
+                street: v.string(),
+                city: v.string(),
+                zipCode: v.string(),
               }),
             }),
           },
         },
         responses: {
           201: {
-            body: z.object({
-              orderId: z.string(),
-              total: z.number(),
-              items: z.array(
-                z.object({
-                  productId: z.string(),
-                  quantity: z.number(),
+            body: v.object({
+              orderId: v.string(),
+              total: v.number(),
+              items: v.array(
+                v.object({
+                  productId: v.string(),
+                  quantity: v.number(),
                 })
               ),
             }),
@@ -496,15 +496,15 @@ describe('OpenAPI Specification Generation', () => {
         method: 'PATCH',
         requests: {
           'application/json': {
-            body: z.object({
-              name: z.string().optional(),
-              email: z.string().email().optional(),
-              age: z.number().int().optional(),
+            body: v.object({
+              name: v.optional(v.string()),
+              email: v.optional(v.pipe(v.string(), v.email())),
+              age: v.optional(v.pipe(v.number(), v.integer())),
             }),
           },
         },
         responses: {
-          200: { body: z.object({ id: z.string() }) },
+          200: { body: v.object({ id: v.string() }) },
         },
       },
     });
@@ -528,13 +528,13 @@ describe('OpenAPI Specification Generation', () => {
         responses: {
           200: {
             'application/json': {
-              body: z.object({ result: z.number() }),
+              body: v.object({ result: v.number() }),
             },
             'text/html': {
-              body: z.string(),
+              body: v.string(),
             },
             'application/xml': {
-              body: z.string(),
+              body: v.string(),
             },
           },
         },
@@ -566,16 +566,16 @@ describe('OpenAPI Specification Generation', () => {
         responses: {
           200: {
             'application/json': {
-              body: z.object({ result: z.number() }),
-              headers: z.object({
-                'Content-Length': z.string(),
-                'X-Request-ID': z.string(),
+              body: v.object({ result: v.number() }),
+              headers: v.object({
+                'Content-Length': v.string(),
+                'X-Request-ID': v.string(),
               }),
             },
             'text/html': {
-              body: z.string(),
-              headers: z.object({
-                'Content-Length': z.string(),
+              body: v.string(),
+              headers: v.object({
+                'Content-Length': v.string(),
               }),
             },
           },
@@ -597,9 +597,9 @@ describe('OpenAPI Specification Generation', () => {
   });
 
   test('should register schemas for all content types', () => {
-    const jsonSchema = z.object({ result: z.number() });
-    const htmlSchema = z.string();
-    const xmlSchema = z.string();
+    const jsonSchema = v.object({ result: v.number() });
+    const htmlSchema = v.string();
+    const xmlSchema = v.string();
 
     const contract = createContract({
       getData: {
@@ -634,13 +634,13 @@ describe('OpenAPI Specification Generation', () => {
         method: 'GET',
         responses: {
           200: {
-            'application/json': { body: z.object({ result: z.number() }) },
+            'application/json': { body: v.object({ result: v.number() }) },
           },
           400: {
-            'application/json': { body: z.object({ error: z.string() }) },
+            'application/json': { body: v.object({ error: v.string() }) },
           },
           500: {
-            'application/json': { body: z.object({ error: z.string(), code: z.string() }) },
+            'application/json': { body: v.object({ error: v.string(), code: v.string() }) },
           },
         },
       },
@@ -663,16 +663,16 @@ describe('OpenAPI Specification Generation', () => {
         method: 'POST',
         requests: {
           'application/json': {
-            body: z.object({
-              email: z.string().email(),
-              uri: z.string().url(),
-              uuid: z.string().uuid(),
-              date: z.string().date(),
+            body: v.object({
+              email: v.pipe(v.string(), v.email()),
+              uri: v.pipe(v.string(), v.url()),
+              uuid: v.pipe(v.string(), v.uuid()),
+              date: v.pipe(v.string(), v.date()),
             }),
           },
         },
         responses: {
-          201: { body: z.object({ id: z.string() }) },
+          201: { body: v.object({ id: v.string() }) },
         },
       },
     });
@@ -719,14 +719,14 @@ describe('OpenAPI Specification Generation', () => {
         method: 'POST',
         requests: {
           'application/json': {
-            body: z.object({
+            body: v.object({
               // Custom regex pattern without standard format
-              customField: z.string().regex(/^[A-Z]{3}-\d{4}$/),
+              customField: v.pipe(v.string(), v.regex(/^[A-Z]{3}-\d{4}$/)),
             }),
           },
         },
         responses: {
-          201: { body: z.object({ id: z.string() }) },
+          201: { body: v.object({ id: v.string() }) },
         },
       },
     });

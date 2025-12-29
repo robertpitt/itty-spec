@@ -23,25 +23,36 @@ export function withContractErrorHandler<
   RequestType extends IRequest = IRequest,
   Args extends any[] = any[],
 >(): (err: unknown, request: RequestType, ...args: Args) => Response {
-  return (err: unknown, request: RequestType, ..._args: Args): Response => {
+  return (err: unknown, _request: RequestType, ..._args: Args): Response => {
+    // Handle validation errors with issues array
     if (err instanceof Error && 'issues' in err) {
+      const issues = (err as Error & { issues: unknown }).issues;
       return new Response(
         JSON.stringify({
           error: 'Validation failed',
-          details: (err as Error & { issues: unknown }).issues,
+          details: Array.isArray(issues) ? issues : [issues],
         }),
         { status: 400, headers: { 'content-type': 'application/json' } }
       );
     }
 
-    // Handle other errors - return error message without circular reference issues
+    // Handle other errors - ensure all errors conform to { error: string, details: [...] }
     const errorMessage = err instanceof Error ? err.message : 'Internal server error';
     const statusCode =
       err && typeof err === 'object' && 'status' in err ? (err as any).status : 500;
 
+    // Format error message as a details array for consistency with validation errors
+    // Details array contains objects with message property (and optionally other fields)
+    const details = [
+      {
+        message: errorMessage,
+      },
+    ];
+
     return new Response(
       JSON.stringify({
         error: errorMessage,
+        details,
       }),
       { status: statusCode, headers: { 'content-type': 'application/json' } }
     );

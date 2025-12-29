@@ -5,7 +5,7 @@ import {
   getResponseSchemaForContentType,
 } from '../../src/utils.js';
 import type { ContractOperation, ResponseByContentType } from '../../src/types.js';
-import { z } from 'zod/v4';
+import * as v from 'valibot';
 
 test('createBasicResponseHelpers should create respond helper', () => {
   const helpers = createBasicResponseHelpers();
@@ -58,7 +58,7 @@ test('createResponseHelpers should create respond helper', () => {
     path: '/test',
     method: 'GET',
     responses: {
-      200: { 'application/json': { body: z.object({ message: z.string() }) } },
+      200: { 'application/json': { body: v.object({ message: v.string() }) } },
     },
   };
 
@@ -82,8 +82,8 @@ test('createResponseHelpers should create respond helper with explicit status', 
     path: '/test',
     method: 'GET',
     responses: {
-      200: { 'application/json': { body: z.object({ message: z.string() }) } },
-      201: { 'application/json': { body: z.object({ id: z.number() }) } },
+      200: { 'application/json': { body: v.object({ message: v.string() }) } },
+      201: { 'application/json': { body: v.object({ id: v.number() }) } },
     },
   };
 
@@ -109,8 +109,8 @@ test('createResponseHelpers should create respond helper with headers', () => {
     responses: {
       200: {
         'application/json': {
-          body: z.object({ message: z.string() }),
-          headers: z.object({ 'content-type': z.string() }),
+          body: v.object({ message: v.string() }),
+          headers: v.object({ 'content-type': v.string() }),
         },
       },
     },
@@ -137,7 +137,7 @@ test('createResponseHelpers should handle no content response', () => {
     path: '/test',
     method: 'DELETE',
     responses: {
-      204: { 'application/json': { body: z.never() } },
+      204: { 'application/json': { body: v.never() } },
     },
   };
 
@@ -157,8 +157,8 @@ test('createResponseHelpers should create error response', () => {
     path: '/test',
     method: 'GET',
     responses: {
-      200: { 'application/json': { body: z.object({ message: z.string() }) } },
-      400: { 'application/json': { body: z.object({ error: z.string() }) } },
+      200: { 'application/json': { body: v.object({ message: v.string() }) } },
+      400: { 'application/json': { body: v.object({ error: v.string() }) } },
     },
   };
 
@@ -182,11 +182,11 @@ test('createResponseHelpers should create error response with headers', () => {
     path: '/test',
     method: 'GET',
     responses: {
-      200: { 'application/json': { body: z.object({ message: z.string() }) } },
+      200: { 'application/json': { body: v.object({ message: v.string() }) } },
       400: {
         'application/json': {
-          body: z.object({ error: z.string() }),
-          headers: z.object({ 'X-Error-Code': z.string() }),
+          body: v.object({ error: v.string() }),
+          headers: v.object({ 'X-Error-Code': v.string() }),
         },
       },
     },
@@ -213,8 +213,8 @@ test('createResponseHelpers should create error response with headers', () => {
 describe('Content type helpers', () => {
   test('getResponseSchemaForContentType should extract schema for content type', () => {
     const contentTypeMap: ResponseByContentType = {
-      'application/json': { body: z.object({ result: z.number() }) },
-      'text/html': { body: z.string() },
+      'application/json': { body: v.object({ result: v.number() }) },
+      'text/html': { body: v.string() },
     };
 
     const jsonSchema = getResponseSchemaForContentType(contentTypeMap, 'application/json');
@@ -228,7 +228,7 @@ describe('Content type helpers', () => {
 
   test('getResponseSchemaForContentType should return null for missing content type', () => {
     const contentTypeMap: ResponseByContentType = {
-      'application/json': { body: z.object({ result: z.number() }) },
+      'application/json': { body: v.object({ result: v.number() }) },
     };
 
     const schema = getResponseSchemaForContentType(contentTypeMap, 'text/xml');
@@ -244,9 +244,9 @@ describe('Content-type-specific response helpers', () => {
       method: 'GET',
       responses: {
         200: {
-          'application/json': { body: z.object({ result: z.number() }) },
-          'text/html': { body: z.string() },
-          'application/xml': { body: z.string() },
+          'application/json': { body: v.object({ result: v.number() }) },
+          'text/html': { body: v.string() },
+          'application/xml': { body: v.string() },
         },
       },
     };
@@ -282,7 +282,7 @@ describe('Content-type-specific response helpers', () => {
       method: 'GET',
       responses: {
         200: {
-          'application/xml': { body: z.string() },
+          'application/xml': { body: v.string() },
         },
       },
     };

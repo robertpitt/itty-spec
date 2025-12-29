@@ -2,7 +2,7 @@ import { test, expect } from 'vitest';
 import { createRouter } from '../../src/router.js';
 import { createContract } from '../../src/contract.js';
 import type { ContractDefinition } from '../../src/types.js';
-import { z } from 'zod/v4';
+import * as v from 'valibot';
 
 test('createContract should return contract definition as-is', () => {
   const definition: ContractDefinition = {
@@ -11,7 +11,7 @@ test('createContract should return contract definition as-is', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
   };
@@ -29,7 +29,7 @@ test('createContract should preserve type inference', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
   });
@@ -46,7 +46,7 @@ test('createContract should handle multiple operations', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
     getUser: {
@@ -54,8 +54,8 @@ test('createContract should handle multiple operations', () => {
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ user: z.string() }) } },
-        404: { 'application/json': { body: z.object({ error: z.string() }) } },
+        200: { 'application/json': { body: v.object({ user: v.string() }) } },
+        404: { 'application/json': { body: v.object({ error: v.string() }) } },
       },
     },
   });
@@ -72,7 +72,7 @@ test('createRouter should create router with contract and handlers', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
   });
@@ -101,7 +101,7 @@ test('createRouter should handle missing routes with default 404', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
   });
@@ -132,7 +132,7 @@ test('createRouter should use custom missing handler', async () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
   });
@@ -171,7 +171,7 @@ test('createRouter should handle base path', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
   });
@@ -200,7 +200,7 @@ test('createRouter should skip operations without handlers', () => {
       path: '/users',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ users: z.array(z.string()) }) } },
+        200: { 'application/json': { body: v.object({ users: v.array(v.string()) }) } },
       },
     },
     getUser: {
@@ -208,7 +208,7 @@ test('createRouter should skip operations without handlers', () => {
       path: '/users/:id',
       method: 'GET',
       responses: {
-        200: { 'application/json': { body: z.object({ user: z.string() }) } },
+        200: { 'application/json': { body: v.object({ user: v.string() }) } },
       },
     },
   });

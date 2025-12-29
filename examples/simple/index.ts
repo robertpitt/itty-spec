@@ -6,9 +6,7 @@ import { createRouter } from '../../src/index.ts';
 import {
   createSpotlightElementsHtml,
   formatCalculateResponseXML,
-  formatCalculateErrorXML,
   formatCalculateResponseHTML,
-  formatCalculateErrorHTML,
 } from './utils.ts';
 import { IRequest } from 'itty-router';
 
@@ -34,29 +32,6 @@ const router = createRouter<typeof contract, IRequest, [ExampleContext]>({
       const result = request.validatedQuery.a + request.validatedQuery.b;
       // Headers are normalized to lowercase in types and runtime, regardless of how they're defined in the schema
       const contentType = request.validatedHeaders.get('content-type');
-
-      if (result > 100) {
-        const errorMessage = 'Invalid request';
-        if (contentType === 'text/html') {
-          return request.respond({
-            status: 400,
-            contentType: 'text/html',
-            body: formatCalculateErrorHTML(errorMessage),
-          });
-        }
-        if (contentType === 'application/xml') {
-          return request.respond({
-            status: 400,
-            contentType: 'application/xml',
-            body: formatCalculateErrorXML(errorMessage),
-          });
-        }
-        return request.respond({
-          status: 400,
-          contentType: 'application/json',
-          body: { error: errorMessage },
-        });
-      }
 
       if (contentType === 'text/html') {
         return request.respond({

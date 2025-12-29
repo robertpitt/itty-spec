@@ -227,13 +227,6 @@ export type Contract<T extends ContractDefinition> = T;
 /**
  * Helper type to merge intersection types into a single object type
  */
-type Simplify<T> = {
-  [K in keyof T]: T[K];
-} & {};
-
-/**
- * Helper type to merge intersection types into a single object type
- */
 type MergeIntersection<T> = {
   [K in keyof T]: T[K];
 };
@@ -461,8 +454,7 @@ export type ContractOperationHeaders<O extends AnyContractOperation> =
  * The `params` property is kept as-is since it's standard in itty-router.
  */
 export interface ContractOperationRequest<O extends AnyContractOperation> extends IRequest {
-  params: ContractOperationParameters<O>;
-  query: RawQuery;
+  validatedParams: ContractOperationParameters<O>;
   validatedQuery: ContractOperationQuery<O>;
   validatedBody: ContractOperationBody<O>;
   validatedHeaders: ContractOperationHeaders<O>;
