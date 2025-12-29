@@ -1,5 +1,5 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec';
-import type { OpenAPIV3_1 } from '../types';
+import type { OpenAPIV3_1 } from 'openapi-types';
 import {
   toOpenAPISchema,
   type ToOpenAPISchemaContext,

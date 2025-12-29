@@ -1,4 +1,4 @@
-import { OpenAPIV3_1 } from '../../src/openapi/types';
+import type { OpenAPIV3_1 } from 'openapi-types';
 
 /**
  * We use an embedded elements

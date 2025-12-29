@@ -1,7 +1,7 @@
 import { test, expect, describe } from 'vitest';
 import { createContract } from '../../src/index.js';
 import { createOpenApiSpecification } from '../../src/openapi/index.js';
-import type { OpenAPIV3_1 } from '../../src/openapi/types.js';
+import type { OpenAPIV3_1 } from 'openapi-types';
 import * as v from 'valibot';
 
 describe('OpenAPI Specification Generation', () => {

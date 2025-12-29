@@ -6,7 +6,7 @@ import {
   RequestByContentType,
   ResponseByContentType,
 } from '../types';
-import type { OpenAPIV3_1 } from './types';
+import type { OpenAPIV3_1 } from 'openapi-types';
 import { extractSchemaAsync } from './vendors/index';
 
 /**
@@ -254,7 +254,7 @@ export const createOpenApiSpecification = async (
 export const createOpenApiInfo = (options: OpenApiSpecificationOptions): OpenAPIV3_1.InfoObject => {
   return {
     title: options.title,
-    version: options.version,
+    version: options.version || '0.0.0',
     description: options.description,
     termsOfService: options.termsOfService,
     contact: options.contact,
@@ -541,7 +541,7 @@ export const createOpenApiPaths = async (
       paths[openApiPath] = {};
     }
     const pathItem = paths[openApiPath]!;
-    const method = operation.method.toLowerCase() as HttpMethod;
+    const method = operation.method.toLowerCase() as Lowercase<HttpMethod>;
     pathItem[method] = await createOpenApiOperation(operation, registry, operationId);
   }
   return paths;
