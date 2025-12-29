@@ -7,7 +7,7 @@ import {
   ResponseByContentType,
 } from '../types';
 import type { OpenAPIV3_1 } from './types';
-import { extractSchema, extractRawJsonSchema, convertJsonSchemaToOpenAPI } from './vendors';
+import { extractSchemaAsync } from './vendors/index';
 
 /**
  * Schema registry for deduplication and reference management
@@ -21,10 +21,10 @@ class SchemaRegistry {
    * Register a schema and return its reference
    * Returns null for empty schemas, ReferenceObject for reference-only schemas, or schema ID string
    */
-  register(
+  async register(
     schema: StandardSchemaV1 | undefined,
     hint?: string
-  ): string | OpenAPIV3_1.ReferenceObject | null {
+  ): Promise<string | OpenAPIV3_1.ReferenceObject | null> {
     if (!schema) return null;
 
     // Check if already registered
@@ -39,7 +39,7 @@ class SchemaRegistry {
           return existingSchema as OpenAPIV3_1.ReferenceObject;
         }
         // Re-check the original schema to handle edge cases
-        const reExtracted = extractSchema(schema);
+        const { schema: reExtracted } = await extractSchemaAsync(schema);
         if (this.isReferenceOnly(reExtracted)) {
           return reExtracted as OpenAPIV3_1.ReferenceObject;
         }
@@ -52,20 +52,17 @@ class SchemaRegistry {
       return this.createSchemaRef(id);
     }
 
-    // Extract raw JSON Schema first to get definitions
-    const raw = extractRawJsonSchema(schema);
+    // Extract schema using standard-openapi (includes components for definitions)
+    const { schema: open, components } = await extractSchemaAsync(schema);
 
-    // Register definitions
-    if (raw.definitions && typeof raw.definitions === 'object') {
-      for (const [name, def] of Object.entries(raw.definitions)) {
+    // Register definitions from components
+    if (components?.schemas) {
+      for (const [name, def] of Object.entries(components.schemas)) {
         if (!this.schemas[name]) {
-          this.schemas[name] = convertJsonSchemaToOpenAPI(def);
+          this.schemas[name] = def as OpenAPIV3_1.SchemaObject;
         }
       }
     }
-
-    // Extract the main schema
-    const open = extractSchema(schema);
 
     // Handle empty schemas
     if (this.isEmpty(open)) {
@@ -189,21 +186,24 @@ export type OpenApiSpecificationOptions = {
 };
 
 /**
- * OpenAPI 3.0.0 schema generator for itty-spec contracts
+ * OpenAPI 3.1 schema generator for itty-spec contracts
  */
-export const createOpenApiSpecification = (
+export const createOpenApiSpecification = async (
   contract: ContractDefinition,
   options: OpenApiSpecificationOptions
-): OpenAPIV3_1.Document => {
+): Promise<OpenAPIV3_1.Document> => {
   const reg = new SchemaRegistry();
 
   // First pass: collect all schemas
+  const schemaPromises: Promise<void>[] = [];
   Object.entries(contract).forEach(([opId, op]) => {
     if (op.requests) {
       buildContent(
         op.requests,
         (ct, s) => {
-          if (s.body) reg.register(s.body, `${opId}Req${sanitize(ct)}`);
+          if (s.body) {
+            schemaPromises.push(reg.register(s.body, `${opId}Req${sanitize(ct)}`).then(() => {}));
+          }
         },
         null
       );
@@ -214,7 +214,11 @@ export const createOpenApiSpecification = (
           buildContent(
             res as ResponseByContentType,
             (ct, s) => {
-              if (s.body) reg.register(s.body, `${opId}Res${sc}${sanitize(ct)}`);
+              if (s.body) {
+                schemaPromises.push(
+                  reg.register(s.body, `${opId}Res${sc}${sanitize(ct)}`).then(() => {})
+                );
+              }
             },
             null
           );
@@ -222,6 +226,9 @@ export const createOpenApiSpecification = (
       });
     }
   });
+
+  // Wait for all schemas to be registered
+  await Promise.all(schemaPromises);
 
   // Second pass: build paths
   const paths: OpenAPIV3_1.PathsObject = {};
@@ -232,7 +239,7 @@ export const createOpenApiSpecification = (
     }
     const pathItem = paths[p]!;
     const method = op.method.toLowerCase() as HttpMethod;
-    pathItem[method] = createOpenApiOperation(op, reg, opId);
+    pathItem[method] = await createOpenApiOperation(op, reg, opId);
   }
 
   return {
@@ -323,12 +330,12 @@ function buildContent<T>(map: Record<string, unknown>, handler: ContentHandler<T
  * Create parameters from a schema for a given location
  * Handles path, query, and header parameters uniformly
  */
-function makeParameters(
+async function makeParameters(
   schema: StandardSchemaV1 | undefined,
   location: 'path' | 'query' | 'header',
   path?: string,
   required: boolean = location === 'path'
-): OpenAPIV3_1.ParameterObject[] {
+): Promise<OpenAPIV3_1.ParameterObject[]> {
   // Handle path parameters when schema is undefined but path is provided
   if (location === 'path' && !schema && path) {
     const pathParamNames = extractPathParamNames(path);
@@ -341,7 +348,7 @@ function makeParameters(
   }
 
   // Extract schema properties
-  const extracted = schema ? extractSchema(schema) : null;
+  const extracted = schema ? (await extractSchemaAsync(schema)).schema : null;
   if (!extracted || typeof extracted !== 'object' || !extracted.properties) {
     // For path params, still extract from path string if no schema
     if (location === 'path' && path) {
@@ -427,79 +434,106 @@ function makeParameters(
 /**
  * Create request body content from content-type map
  */
-function makeRequestContent(
+async function makeRequestContent(
   requests: RequestByContentType,
   reg: SchemaRegistry,
   opId: string
-): Record<string, OpenAPIV3_1.MediaTypeObject> {
-  return buildContent(
+): Promise<Record<string, OpenAPIV3_1.MediaTypeObject>> {
+  const content: Record<string, OpenAPIV3_1.MediaTypeObject> = {};
+  const promises: Promise<void>[] = [];
+
+  buildContent(
     requests,
-    (ct, { body }, content) => {
+    async (ct, { body }) => {
       if (body) {
-        const ref = reg.register(body, `${opId}Req${sanitize(ct)}`);
-        if (ref) {
-          content[ct] = {
-            schema: typeof ref === 'string' ? { $ref: `#/components/schemas/${ref}` } : ref,
-          };
-        }
+        promises.push(
+          reg.register(body, `${opId}Req${sanitize(ct)}`).then((ref) => {
+            if (ref) {
+              content[ct] = {
+                schema: typeof ref === 'string' ? { $ref: `#/components/schemas/${ref}` } : ref,
+              };
+            }
+          })
+        );
       }
     },
-    {} as Record<string, OpenAPIV3_1.MediaTypeObject>
+    null
   );
+
+  await Promise.all(promises);
+  return content;
 }
 
 /**
  * Create response content and headers from content-type map
  */
-function makeResponseContent(
+async function makeResponseContent(
   responses: ResponseByContentType,
   reg: SchemaRegistry,
   opId: string,
   status: string
-): {
+): Promise<{
   content: Record<string, OpenAPIV3_1.MediaTypeObject>;
   headers: Record<string, OpenAPIV3_1.HeaderObject>;
-} {
-  return buildContent(
+}> {
+  const acc: {
+    content: Record<string, OpenAPIV3_1.MediaTypeObject>;
+    headers: Record<string, OpenAPIV3_1.HeaderObject>;
+  } = { content: {}, headers: {} };
+  const promises: Promise<void>[] = [];
+
+  buildContent(
     responses,
-    (ct, { body, headers }, acc) => {
+    async (ct, { body, headers }) => {
       const media: OpenAPIV3_1.MediaTypeObject = {};
-      const ref = body && reg.register(body, `${opId}Res${status}${sanitize(ct)}`);
-      if (ref) {
-        media.schema = typeof ref === 'string' ? { $ref: `#/components/schemas/${ref}` } : ref;
+      if (body) {
+        promises.push(
+          reg.register(body, `${opId}Res${status}${sanitize(ct)}`).then((ref) => {
+            if (ref) {
+              media.schema =
+                typeof ref === 'string' ? { $ref: `#/components/schemas/${ref}` } : ref;
+            }
+            acc.content[ct] = media;
+          })
+        );
+      } else {
+        acc.content[ct] = media;
       }
-      acc.content[ct] = media;
 
       if (headers) {
-        const hdrs = extractSchema(headers).properties ?? {};
-        Object.assign(
-          acc.headers,
-          Object.fromEntries(
-            Object.entries(hdrs).map(([k, sch]) => [
-              k,
-              {
-                schema: sch as OpenAPIV3_1.SchemaObject,
-                description: (sch as OpenAPIV3_1.SchemaObject).description,
-              },
-            ])
-          )
+        promises.push(
+          extractSchemaAsync(headers).then(({ schema }: { schema: OpenAPIV3_1.SchemaObject }) => {
+            const hdrs = schema.properties ?? {};
+            Object.assign(
+              acc.headers,
+              Object.fromEntries(
+                Object.entries(hdrs).map(([k, sch]) => [
+                  k,
+                  {
+                    schema: sch as OpenAPIV3_1.SchemaObject,
+                    description: (sch as OpenAPIV3_1.SchemaObject).description,
+                  },
+                ])
+              )
+            );
+          })
         );
       }
     },
-    { content: {}, headers: {} } as {
-      content: Record<string, OpenAPIV3_1.MediaTypeObject>;
-      headers: Record<string, OpenAPIV3_1.HeaderObject>;
-    }
+    null
   );
+
+  await Promise.all(promises);
+  return acc;
 }
 
 /**
  * Creates the OpenAPI paths
  */
-export const createOpenApiPaths = (
+export const createOpenApiPaths = async (
   contract: ContractDefinition,
   registry: SchemaRegistry
-): OpenAPIV3_1.PathsObject => {
+): Promise<OpenAPIV3_1.PathsObject> => {
   const paths: OpenAPIV3_1.PathsObject = {};
   for (const [operationId, operation] of Object.entries(contract)) {
     const openApiPath = convertPathToOpenAPIFormat(operation.path);
@@ -508,7 +542,7 @@ export const createOpenApiPaths = (
     }
     const pathItem = paths[openApiPath]!;
     const method = operation.method.toLowerCase() as HttpMethod;
-    pathItem[method] = createOpenApiOperation(operation, registry, operationId);
+    pathItem[method] = await createOpenApiOperation(operation, registry, operationId);
   }
   return paths;
 };
@@ -516,11 +550,11 @@ export const createOpenApiPaths = (
 /**
  * Creates the OpenAPI operation object
  */
-function createOpenApiOperation(
+async function createOpenApiOperation(
   operation: ContractOperation,
   registry: SchemaRegistry,
   operationId: string
-): OpenAPIV3_1.OperationObject {
+): Promise<OpenAPIV3_1.OperationObject> {
   const operationObj: OpenAPIV3_1.OperationObject = {
     operationId: operation.operationId || operationId,
     summary: operation.summary,
@@ -529,10 +563,16 @@ function createOpenApiOperation(
   };
 
   // Collect parameters
+  const [pathParams, queryParams, headerParams] = await Promise.all([
+    makeParameters(operation.pathParams, 'path', operation.path),
+    makeParameters(operation.query, 'query'),
+    makeParameters(operation.headers, 'header'),
+  ]);
+
   const parameters: OpenAPIV3_1.ParameterObject[] = [
-    ...makeParameters(operation.pathParams, 'path', operation.path),
-    ...makeParameters(operation.query, 'query'),
-    ...makeParameters(operation.headers, 'header'),
+    ...pathParams,
+    ...queryParams,
+    ...headerParams,
   ].filter(Boolean);
 
   if (parameters.length > 0) {
@@ -541,7 +581,7 @@ function createOpenApiOperation(
 
   // Request body
   if (operation.requests) {
-    const content = makeRequestContent(
+    const content = await makeRequestContent(
       operation.requests as RequestByContentType,
       registry,
       operationId
@@ -553,11 +593,11 @@ function createOpenApiOperation(
 
   // Responses
   if (operation.responses) {
-    operationObj.responses = Object.fromEntries(
+    const responseEntries = await Promise.all(
       Object.entries(operation.responses)
         .filter(([_, res]) => res && typeof res === 'object')
-        .map(([sc, res]) => {
-          const { content, headers } = makeResponseContent(
+        .map(async ([sc, res]) => {
+          const { content, headers } = await makeResponseContent(
             res as ResponseByContentType,
             registry,
             operationId,
@@ -566,9 +606,10 @@ function createOpenApiOperation(
           const responseObj: OpenAPIV3_1.ResponseObject = { description: '' };
           if (Object.keys(content).length > 0) responseObj.content = content;
           if (Object.keys(headers).length > 0) responseObj.headers = headers;
-          return [sc, responseObj];
+          return [sc, responseObj] as [string, OpenAPIV3_1.ResponseObject];
         })
     );
+    operationObj.responses = Object.fromEntries(responseEntries);
   }
 
   return operationObj;

@@ -15,7 +15,7 @@ import { join } from 'path';
 /**
  * Convert the contract to an OpenAPI specification
  */
-const openApiSpecification = createOpenApiSpecification(contract, {
+const openApiSpecification = await createOpenApiSpecification(contract, {
   title: 'Complex API',
   version: '1.0.0',
   description: readFileSync(join(import.meta.dirname, 'description.md'), 'utf8'),

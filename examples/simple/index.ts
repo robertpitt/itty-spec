@@ -13,7 +13,7 @@ import { IRequest } from 'itty-router';
 /**
  * Convert the contract to an OpenAPI specification so we can serve it from the router
  */
-const openApiSpecification = createOpenApiSpecification(contract, {
+const openApiSpecification = await createOpenApiSpecification(contract, {
   title: 'Simple API',
   version: '1.0.0',
   // markdown description showing of the markdown syntax

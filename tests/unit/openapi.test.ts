@@ -5,7 +5,7 @@ import type { OpenAPIV3_1 } from '../../src/openapi/types.js';
 import * as v from 'valibot';
 
 describe('OpenAPI Specification Generation', () => {
-  test('should generate basic OpenAPI spec with minimal contract', () => {
+  test('should generate basic OpenAPI spec with minimal contract', async () => {
     const contract = createContract({
       getUsers: {
         path: '/users',
@@ -16,7 +16,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -28,7 +28,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(spec.components).toBeDefined();
   });
 
-  test('should convert path format from :param to {param}', () => {
+  test('should convert path format from :param to {param}', async () => {
     const contract = createContract({
       getUser: {
         path: '/users/:id',
@@ -39,7 +39,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -48,7 +48,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(spec.paths?.['/users/:id']).toBeUndefined();
   });
 
-  test('should extract path parameters from path string', () => {
+  test('should extract path parameters from path string', async () => {
     const contract = createContract({
       getUser: {
         path: '/users/:id',
@@ -59,7 +59,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -76,7 +76,7 @@ describe('OpenAPI Specification Generation', () => {
     });
   });
 
-  test('should use pathParams schema when provided', () => {
+  test('should use pathParams schema when provided', async () => {
     const contract = createContract({
       getUser: {
         path: '/users/:id',
@@ -90,7 +90,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -104,7 +104,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(param?.description).toBe('User UUID');
   });
 
-  test('should fallback to string for path params not in schema', () => {
+  test('should fallback to string for path params not in schema', async () => {
     const contract = createContract({
       getUserPost: {
         path: '/users/:userId/posts/:postId',
@@ -119,7 +119,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -134,7 +134,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(postIdParam?.schema).toEqual({ type: 'string' });
   });
 
-  test('should extract query parameters from query schema', () => {
+  test('should extract query parameters from query schema', async () => {
     const contract = createContract({
       getUsers: {
         path: '/users',
@@ -150,7 +150,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -183,7 +183,7 @@ describe('OpenAPI Specification Generation', () => {
     });
   });
 
-  test('should extract request body from request schema', () => {
+  test('should extract request body from request schema', async () => {
     const contract = createContract({
       createUser: {
         path: '/users',
@@ -203,7 +203,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -218,7 +218,7 @@ describe('OpenAPI Specification Generation', () => {
     );
   });
 
-  test('should extract request headers from headers schema', () => {
+  test('should extract request headers from headers schema', async () => {
     const contract = createContract({
       getUsers: {
         path: '/users',
@@ -233,7 +233,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -258,7 +258,7 @@ describe('OpenAPI Specification Generation', () => {
     });
   });
 
-  test('should extract response bodies and headers', () => {
+  test('should extract response bodies and headers', async () => {
     const contract = createContract({
       getUser: {
         path: '/users/:id',
@@ -286,7 +286,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -309,7 +309,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(response404?.content).toBeDefined();
   });
 
-  test('should register schemas in components.schemas', () => {
+  test('should register schemas in components.schemas', async () => {
     const contract = createContract({
       createUser: {
         path: '/users',
@@ -328,7 +328,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -337,7 +337,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(Object.keys(spec.components?.schemas || {})).not.toHaveLength(0);
   });
 
-  test('should deduplicate schemas when reused', () => {
+  test('should deduplicate schemas when reused', async () => {
     const userSchema = v.object({
       id: v.string(),
       name: v.string(),
@@ -366,7 +366,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -378,7 +378,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(schemaKeys.length).toBeLessThan(3);
   });
 
-  test('should handle multiple operations on same path', () => {
+  test('should handle multiple operations on same path', async () => {
     const contract = createContract({
       getUsers: {
         path: '/users',
@@ -401,7 +401,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -411,7 +411,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(pathItem?.post).toBeDefined();
   });
 
-  test('should include operation metadata', () => {
+  test('should include operation metadata', async () => {
     const contract = createContract({
       getUser: {
         operationId: 'getUserById',
@@ -426,7 +426,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -438,7 +438,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(operation?.tags).toEqual(['users']);
   });
 
-  test('should handle complex nested schemas', () => {
+  test('should handle complex nested schemas', async () => {
     const contract = createContract({
       createOrder: {
         path: '/orders',
@@ -478,7 +478,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -489,7 +489,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(operation?.responses?.['201']).toBeDefined();
   });
 
-  test('should handle optional fields correctly', () => {
+  test('should handle optional fields correctly', async () => {
     const contract = createContract({
       updateUser: {
         path: '/users/:id',
@@ -509,7 +509,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -520,7 +520,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(spec.components?.schemas).toBeDefined();
   });
 
-  test('should support content-type-specific responses (new format)', () => {
+  test('should support content-type-specific responses (new format)', async () => {
     const contract = createContract({
       getData: {
         path: '/data',
@@ -541,7 +541,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -558,7 +558,7 @@ describe('OpenAPI Specification Generation', () => {
     );
   });
 
-  test('should support different headers per content type', () => {
+  test('should support different headers per content type', async () => {
     const contract = createContract({
       getData: {
         path: '/data',
@@ -583,7 +583,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -596,7 +596,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(response200?.headers?.['X-Request-ID']).toBeDefined();
   });
 
-  test('should register schemas for all content types', () => {
+  test('should register schemas for all content types', async () => {
     const jsonSchema = v.object({ result: v.number() });
     const htmlSchema = v.string();
     const xmlSchema = v.string();
@@ -615,7 +615,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -627,7 +627,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(schemaKeys.length).toBeGreaterThanOrEqual(3);
   });
 
-  test('should handle error responses with content-type maps', () => {
+  test('should handle error responses with content-type maps', async () => {
     const contract = createContract({
       getData: {
         path: '/data',
@@ -646,7 +646,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -656,7 +656,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(operation?.responses?.['500']?.content?.['application/json']).toBeDefined();
   });
 
-  test('should not include pattern when standard OpenAPI format is present', () => {
+  test('should not include pattern when standard OpenAPI format is present', async () => {
     const contract = createContract({
       createUser: {
         path: '/users',
@@ -667,7 +667,7 @@ describe('OpenAPI Specification Generation', () => {
               email: v.pipe(v.string(), v.email()),
               uri: v.pipe(v.string(), v.url()),
               uuid: v.pipe(v.string(), v.uuid()),
-              date: v.pipe(v.string(), v.date()),
+              date: v.pipe(v.string(), v.isoDate()),
             }),
           },
         },
@@ -677,7 +677,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
@@ -712,7 +712,7 @@ describe('OpenAPI Specification Generation', () => {
     expect(uuidSchema?.pattern).toBeUndefined();
   });
 
-  test('should include pattern when format is not a standard OpenAPI format', () => {
+  test('should include pattern when format is not a standard OpenAPI format', async () => {
     const contract = createContract({
       createUser: {
         path: '/users',
@@ -731,7 +731,7 @@ describe('OpenAPI Specification Generation', () => {
       },
     });
 
-    const spec = createOpenApiSpecification(contract, {
+    const spec = await createOpenApiSpecification(contract, {
       title: 'Test API',
       version: '1.0.0',
     });
