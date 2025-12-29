@@ -1,6 +1,10 @@
 # API Reference
 
-## createContract
+Complete API reference for `itty-spec`. All functions, types, and utilities are documented here.
+
+## Core Functions
+
+### [createContract](/api/create-contract)
 
 Creates a contract object that defines your API operations.
 
@@ -10,13 +14,13 @@ import { createContract } from "itty-spec";
 const contract = createContract({
   operationName: {
     path: "/path",
-    method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
-    // ... operation definition
+    method: "GET",
+    responses: { /* ... */ },
   },
 });
 ```
 
-## createRouter
+### [createRouter](/api/create-router)
 
 Creates a router with handlers bound to a contract.
 
@@ -33,7 +37,7 @@ const router = createRouter({
 });
 ```
 
-## createOpenApiSpecification
+### [createOpenApiSpecification](/api/create-openapi-specification)
 
 Generates an OpenAPI 3.1 specification from a contract.
 
@@ -48,5 +52,27 @@ const spec = await createOpenApiSpecification(contract, {
 });
 ```
 
-For detailed API documentation, refer to the TypeScript definitions in the source code.
+## Type Reference
+
+### [Types](/api/types)
+
+Complete reference for all TypeScript types used in `itty-spec`:
+
+- Contract types
+- Request types
+- Response types
+- Helper types
+
+### [Middleware API](/api/middleware-api)
+
+Reference for built-in middleware and custom middleware patterns.
+
+## Quick Links
+
+- [Contracts Guide](/guide/contracts) - Learn about contract definitions
+- [Router Configuration](/guide/router-configuration) - Configure your router
+- [Type Safety](/guide/type-safety) - Understand type inference
+- [Examples](/examples/) - Working examples
+
+For detailed type definitions, see the TypeScript source code.
 
