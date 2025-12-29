@@ -590,6 +590,57 @@ export type ContractOperationHandler<O extends ContractOperation, Args extends a
 ) => Promise<ContractOperationResponse<O>>;
 
 /**
+ * Extract handler type for a specific contract operation
+ * Useful when defining handlers in separate files that reference contract operations
+ *
+ * @example
+ * ```typescript
+ * import { usersContract } from './contracts/users.contract';
+ * import { HandlerForContract } from 'itty-spec';
+ *
+ * type GetUsersHandler = HandlerForContract<typeof usersContract, 'getUsers'>;
+ *
+ * export const getUsers: GetUsersHandler = async (request) => {
+ *   // request is fully typed based on usersContract.getUsers
+ *   const { page, limit } = request.validatedQuery;
+ *   // ...
+ * };
+ * ```
+ */
+export type HandlerForContract<
+  TContract extends ContractDefinition,
+  K extends keyof TContract,
+  Args extends any[] = any[],
+> = ContractOperationHandler<TContract[K], Args>;
+
+/**
+ * Extract all handler types for a contract
+ * Useful for type-checking a complete handlers object against a contract
+ *
+ * @example
+ * ```typescript
+ * import { usersContract } from './contracts/users.contract';
+ * import { HandlersForContract } from 'itty-spec';
+ *
+ * const userHandlers: HandlersForContract<typeof usersContract> = {
+ *   getUsers: async (request) => {
+ *     // implementation
+ *   },
+ *   getUserById: async (request) => {
+ *     // implementation
+ *   },
+ *   // TypeScript will ensure all operations are handled
+ * };
+ * ```
+ */
+export type HandlersForContract<
+  TContract extends ContractDefinition,
+  Args extends any[] = any[],
+> = {
+  [K in keyof TContract]: HandlerForContract<TContract, K, Args>;
+};
+
+/**
  * Contract router type - maps operation IDs to their handlers
  * Note: Renamed from Router to avoid conflict with itty-router's Router function
  */

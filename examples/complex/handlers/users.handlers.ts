@@ -1,13 +1,15 @@
 import { userDb } from '../utils/database';
 import { paginate } from '../utils/pagination';
-import type { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { usersContract } from '../contracts/users.contract';
+import { defineHandlers } from '../../../src/handler';
 
 /**
  * User handlers - implement all user-related endpoints
+ * Each handler is typed against its contract operation for full type safety
  */
 
-export const userHandlers = {
-  getUsers: async (request: AuthenticatedRequest) => {
+export const userHandlers = defineHandlers(usersContract, {
+  getUsers: async (request) => {
     const { page = 1, limit = 20, role, status, search } = request.validatedQuery || {};
 
     const filters = { role, status, search };
@@ -24,8 +26,8 @@ export const userHandlers = {
     });
   },
 
-  getUserById: async (request: AuthenticatedRequest) => {
-    const { id } = request.validatedPathParams;
+  getUserById: async (request) => {
+    const { id } = request.validatedParams;
     const user = userDb.findById(id);
 
     if (!user) {
@@ -46,7 +48,7 @@ export const userHandlers = {
     });
   },
 
-  createUser: async (request: AuthenticatedRequest) => {
+  createUser: async (request) => {
     const data = request.validatedBody;
 
     // Check if email already exists
@@ -78,8 +80,8 @@ export const userHandlers = {
     });
   },
 
-  updateUser: async (request: AuthenticatedRequest) => {
-    const { id } = request.validatedPathParams;
+  updateUser: async (request) => {
+    const { id } = request.validatedParams;
     const data = request.validatedBody;
 
     const user = userDb.findById(id);
@@ -113,8 +115,8 @@ export const userHandlers = {
     });
   },
 
-  deleteUser: async (request: AuthenticatedRequest) => {
-    const { id } = request.validatedPathParams;
+  deleteUser: async (request) => {
+    const { id } = request.validatedParams;
 
     const user = userDb.findById(id);
     if (!user) {
@@ -136,4 +138,4 @@ export const userHandlers = {
       body: undefined,
     });
   },
-};
+});

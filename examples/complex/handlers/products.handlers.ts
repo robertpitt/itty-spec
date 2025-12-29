@@ -1,13 +1,15 @@
 import { productDb } from '../utils/database';
 import { paginate } from '../utils/pagination';
-import type { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { productsContract } from '../contracts/products.contract';
+import { defineHandlers } from '../../../src/handler';
 
 /**
  * Product handlers - implement all product-related endpoints
+ * Each handler is typed against its contract operation for full type safety
  */
 
-export const productHandlers = {
-  getProducts: async (request: AuthenticatedRequest) => {
+export const productHandlers = defineHandlers(productsContract, {
+  getProducts: async (request) => {
     const {
       page = 1,
       limit = 20,
@@ -41,7 +43,7 @@ export const productHandlers = {
     });
   },
 
-  getProductById: async (request: AuthenticatedRequest) => {
+  getProductById: async (request) => {
     const { id } = request.validatedPathParams;
     const product = productDb.findById(id);
 
@@ -63,7 +65,7 @@ export const productHandlers = {
     });
   },
 
-  createProduct: async (request: AuthenticatedRequest) => {
+  createProduct: async (request) => {
     const data = request.validatedBody;
     const product = productDb.create({
       name: data.name,
@@ -85,7 +87,7 @@ export const productHandlers = {
     });
   },
 
-  updateProduct: async (request: AuthenticatedRequest) => {
+  updateProduct: async (request) => {
     const { id } = request.validatedPathParams;
     const data = request.validatedBody;
 
@@ -120,7 +122,7 @@ export const productHandlers = {
     });
   },
 
-  deleteProduct: async (request: AuthenticatedRequest) => {
+  deleteProduct: async (request) => {
     const { id } = request.validatedPathParams;
 
     const product = productDb.findById(id);
@@ -143,4 +145,4 @@ export const productHandlers = {
       body: undefined,
     });
   },
-};
+});

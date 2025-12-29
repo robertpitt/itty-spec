@@ -2,16 +2,18 @@ import { z } from 'zod/v4';
 import { orderDb, productDb } from '../utils/database';
 import { paginate } from '../utils/pagination';
 import { OrderItem } from '../schemas/orders';
-import type { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { ordersContract } from '../contracts/orders.contract';
+import { defineHandlers } from '../../../src/handler';
 
 type OrderItemType = z.infer<typeof OrderItem>;
 
 /**
  * Order handlers - implement all order-related endpoints
+ * Each handler is typed against its contract operation for full type safety
  */
 
-export const orderHandlers = {
-  getOrders: async (request: AuthenticatedRequest) => {
+export const orderHandlers = defineHandlers(ordersContract, {
+  getOrders: async (request) => {
     const {
       page = 1,
       limit = 20,
@@ -48,7 +50,7 @@ export const orderHandlers = {
     });
   },
 
-  getOrderById: async (request: AuthenticatedRequest) => {
+  getOrderById: async (request) => {
     const { id } = request.validatedPathParams;
     const order = orderDb.findById(id);
 
@@ -70,7 +72,7 @@ export const orderHandlers = {
     });
   },
 
-  createOrder: async (request: AuthenticatedRequest) => {
+  createOrder: async (request) => {
     const data = request.validatedBody;
 
     // Validate products exist and calculate totals
@@ -138,7 +140,7 @@ export const orderHandlers = {
     });
   },
 
-  updateOrderStatus: async (request: AuthenticatedRequest) => {
+  updateOrderStatus: async (request) => {
     const { id } = request.validatedPathParams;
     const { status } = request.validatedBody;
 
@@ -173,7 +175,7 @@ export const orderHandlers = {
     });
   },
 
-  getUserOrders: async (request: AuthenticatedRequest) => {
+  getUserOrders: async (request) => {
     const { id } = request.validatedPathParams;
     const { page = 1, limit = 20, status } = request.validatedQuery || {};
 
@@ -194,4 +196,4 @@ export const orderHandlers = {
       },
     });
   },
-};
+});

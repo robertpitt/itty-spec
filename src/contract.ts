@@ -1,4 +1,10 @@
-import { ContractDefinition } from './types';
+import { IRequest } from 'itty-router';
+import {
+  ContractDefinition,
+  ContractOperation,
+  ContractOperationHandler,
+  HandlersForContract,
+} from './types';
 
 /**
  * Creates a contract from a contract definition
@@ -53,4 +59,74 @@ import { ContractDefinition } from './types';
  */
 export function createContract<T extends ContractDefinition>(definition: T): T {
   return definition;
+}
+
+/**
+ * Define handlers for a contract with type safety
+ * This function validates that handlers match the contract and can be used
+ * to define handlers in separate files that will be combined later
+ *
+ * The function accepts handlers that may use extended request types (e.g., AuthenticatedRequest)
+ * as long as they are compatible with the contract's ContractRequest type.
+ *
+ * @typeParam TContract - The contract definition type
+ * @typeParam Args - Additional arguments passed to handlers (defaults to any[])
+ *
+ * @param contract - The contract definition to validate handlers against
+ * @param handlers - Handlers object that must match all operations in the contract.
+ *                   Handlers can use extended request types (e.g., AuthenticatedRequest)
+ *                   as long as they extend IRequest and are compatible with ContractRequest.
+ * @returns The handlers object with full type safety, ready to be combined with other handlers
+ *
+ * @example
+ * ```typescript
+ * // handlers/users.handlers.ts
+ * import { usersContract } from '../contracts/users.contract';
+ * import { defineHandlers } from 'itty-spec';
+ * import type { AuthenticatedRequest } from '../middleware/auth.middleware';
+ *
+ * export const userHandlers = defineHandlers(usersContract, {
+ *   getUsers: async (request: AuthenticatedRequest) => {
+ *     // request is fully typed based on usersContract.getUsers
+ *     // and also has userId, userRole from AuthenticatedRequest
+ *     const { page, limit } = request.validatedQuery;
+ *     return request.respond({
+ *       status: 200,
+ *       contentType: 'application/json',
+ *       body: { users: [] },
+ *     });
+ *   },
+ *   getUserById: async (request: AuthenticatedRequest) => {
+ *     // implementation
+ *   },
+ *   // TypeScript will ensure all contract operations have handlers
+ * });
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // index.ts - combine handlers later
+ * import { userHandlers } from './handlers/users.handlers';
+ * import { productHandlers } from './handlers/products.handlers';
+ * import { contract } from './contracts';
+ *
+ * const router = createRouter({
+ *   contract,
+ *   handlers: {
+ *     ...userHandlers,
+ *     ...productHandlers,
+ *   },
+ * });
+ * ```
+ */
+export function defineHandlers<TContract extends ContractDefinition, Args extends any[] = any[]>(
+  contract: TContract,
+  handlers: {
+    [K in keyof TContract]: (
+      request: IRequest & Parameters<ContractOperationHandler<TContract[K], Args>>[0],
+      ...args: Args
+    ) => ReturnType<ContractOperationHandler<TContract[K], Args>>;
+  }
+): HandlersForContract<TContract, Args> {
+  return handlers as HandlersForContract<TContract, Args>;
 }

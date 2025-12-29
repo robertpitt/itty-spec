@@ -3,9 +3,7 @@ import { createServer } from 'http';
 import { contract } from './contracts';
 import { createOpenApiSpecification } from '../../src/openapi';
 import { createRouter } from '../../src/index.ts';
-import { userHandlers } from './handlers/users.handlers';
-import { productHandlers } from './handlers/products.handlers';
-import { orderHandlers } from './handlers/orders.handlers';
+import { userHandlers, orderHandlers, productHandlers } from './handlers';
 import { initializeSampleData } from './utils/database';
 import { createSpotlightElementsHtml } from './utils/docs';
 import { withAuth } from './middleware/auth.middleware';
@@ -48,27 +46,12 @@ initializeSampleData();
  */
 const router = createRouter({
   contract,
-  before: [
-    // Add authentication middleware to all requests
-    withAuth,
-  ],
+  before: [withAuth],
   handlers: {
     // User handlers
-    getUsers: userHandlers.getUsers,
-    getUserById: userHandlers.getUserById,
-    createUser: userHandlers.createUser,
-    updateUser: userHandlers.updateUser,
-    deleteUser: userHandlers.deleteUser,
-    getProducts: productHandlers.getProducts,
-    getProductById: productHandlers.getProductById,
-    createProduct: productHandlers.createProduct,
-    updateProduct: productHandlers.updateProduct,
-    deleteProduct: productHandlers.deleteProduct,
-    getOrders: orderHandlers.getOrders,
-    getOrderById: orderHandlers.getOrderById,
-    createOrder: orderHandlers.createOrder,
-    updateOrderStatus: orderHandlers.updateOrderStatus,
-    getUserOrders: orderHandlers.getUserOrders,
+    ...userHandlers,
+    ...productHandlers,
+    ...orderHandlers,
     getSpec: async (request) => {
       return request.respond({
         status: 200,
