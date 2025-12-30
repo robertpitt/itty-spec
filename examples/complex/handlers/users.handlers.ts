@@ -1,7 +1,7 @@
 import { userDb } from '../utils/database';
 import { paginate } from '../utils/pagination';
 import { usersContract } from '../contracts/users.contract';
-import { defineHandlers } from '../../../src/handler';
+import { defineHandlers } from '../../../src/contract';
 
 /**
  * User handlers - implement all user-related endpoints

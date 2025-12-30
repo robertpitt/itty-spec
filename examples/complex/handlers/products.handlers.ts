@@ -1,7 +1,7 @@
 import { productDb } from '../utils/database';
 import { paginate } from '../utils/pagination';
 import { productsContract } from '../contracts/products.contract';
-import { defineHandlers } from '../../../src/handler';
+import { defineHandlers } from '../../../src/contract';
 
 /**
  * Product handlers - implement all product-related endpoints

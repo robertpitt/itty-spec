@@ -3,7 +3,7 @@ import { orderDb, productDb } from '../utils/database';
 import { paginate } from '../utils/pagination';
 import { OrderItem } from '../schemas/orders';
 import { ordersContract } from '../contracts/orders.contract';
-import { defineHandlers } from '../../../src/handler';
+import { defineHandlers } from '../../../src/contract';
 
 type OrderItemType = z.infer<typeof OrderItem>;
 
